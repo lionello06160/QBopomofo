@@ -22,6 +22,8 @@ final class ChewingBridge: ObservableObject {
     @Published var showCandidates: Bool = false
     /// Text that has been committed (accumulated output)
     @Published var committedText: String = ""
+    /// Whether currently in English input mode
+    @Published var isEnglishMode: Bool = false
     /// Log of engine events for debugging
     @Published var debugLog: [String] = []
     /// Current typing mode
@@ -89,10 +91,74 @@ final class ChewingBridge: ObservableObject {
 
     // MARK: - Key Handling
 
+    /// Handle Shift key press/release for SmartToggle behavior.
+    /// Call this from flagsChanged event.
+    func handleShiftToggle(isShiftDown: Bool) {
+        if shiftBehavior == .none {
+            log("Shift \(isShiftDown ? "↓" : "↑") (behavior: none, ignored)")
+            return
+        }
+
+        if shiftBehavior == .smartToggle {
+            if isShiftDown {
+                shiftHeldDown = true
+                wasInChineseBeforeShift = !isEnglishMode
+                log("Shift ↓ (SmartToggle: waiting for release or typing)")
+            } else {
+                if shiftHeldDown && !shiftTypedWhileHeld {
+                    // Short press — toggle mode
+                    isEnglishMode.toggle()
+                    log("Shift ↑ short press → \(isEnglishMode ? "英文" : "中文") mode")
+                } else if shiftHeldDown && shiftTypedWhileHeld && wasInChineseBeforeShift {
+                    // Was held + typed — return to Chinese
+                    isEnglishMode = false
+                    log("Shift ↑ hold released → 回到中文 mode")
+                } else {
+                    log("Shift ↑")
+                }
+                shiftHeldDown = false
+                shiftTypedWhileHeld = false
+            }
+        } else if shiftBehavior == .toggleOnly {
+            if !isShiftDown {
+                isEnglishMode.toggle()
+                log("Shift ↑ toggle → \(isEnglishMode ? "英文" : "中文") mode")
+            } else {
+                log("Shift ↓")
+            }
+        }
+    }
+
+    private var shiftHeldDown = false
+    private var shiftTypedWhileHeld = false
+    private var wasInChineseBeforeShift = true
+
     /// Process a key event. Returns true if the key was handled.
     func handleKey(keyCode: UInt16, characters: String, shift: Bool = false) -> Bool {
         guard let ctx = ctx else { return false }
 
+        // If Shift is held and we're in SmartToggle, type English temporarily
+        if shift && shiftHeldDown && shiftBehavior == .smartToggle {
+            shiftTypedWhileHeld = true
+            // In temporary English mode — output the character directly
+            if let ch = characters.first, ch.isASCII {
+                committedText += String(ch)
+                isEnglishMode = true  // Show as English mode while held
+                log("Key (temp English): '\(ch)'")
+                return true
+            }
+        }
+
+        // English mode — pass through as direct text
+        if isEnglishMode {
+            if let ch = characters.first, ch.isASCII, !ch.isNewline {
+                committedText += String(ch)
+                log("Key (English): '\(ch)'")
+                return true
+            }
+        }
+
+        // Chinese mode — send to chewing engine
         let handled = processKey(ctx: ctx, keyCode: keyCode, chars: characters, shift: shift)
 
         if handled {

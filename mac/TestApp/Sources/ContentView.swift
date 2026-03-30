@@ -19,6 +19,17 @@ struct ContentView: View {
                 Text("QBopomofo 模擬輸入框")
                     .font(.headline)
                 Spacer()
+
+                // 中/英 狀態指示
+                Text(engine.isEnglishMode ? "英" : "中")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(engine.isEnglishMode ? .orange : .blue)
+                    .frame(width: 28, height: 28)
+                    .background(
+                        (engine.isEnglishMode ? Color.orange : Color.blue).opacity(0.15)
+                    )
+                    .cornerRadius(6)
+
                 Picker("模式", selection: Binding(
                     get: { engine.currentMode },
                     set: { engine.switchMode($0) }
@@ -332,6 +343,14 @@ class KeyCaptureNSView: NSView {
             if !handled {
                 super.keyDown(with: event)
             }
+        }
+    }
+
+    override func flagsChanged(with event: NSEvent) {
+        guard let engine = engine else { return }
+        let isShiftDown = event.modifierFlags.contains(.shift)
+        Task { @MainActor in
+            engine.handleShiftToggle(isShiftDown: isShiftDown)
         }
     }
 
