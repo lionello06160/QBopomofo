@@ -45,8 +45,13 @@ int qb_composing_handle_shift(QBComposingSession *session, int is_down, const ch
 /** Check if Shift is currently held down. */
 int qb_composing_is_shift_held(const QBComposingSession *session);
 
-/** Type an English character into the composing buffer. */
-void qb_composing_type_english(QBComposingSession *session, uint8_t ch);
+/**
+ * Type an English character.
+ * @param has_chinese_buffer 1 if chewing has composing text, 0 if empty.
+ * @return 1 if caller should directly commit this character (no Chinese context),
+ *         0 if character was added to mixed composing buffer.
+ */
+int qb_composing_type_english(QBComposingSession *session, uint8_t ch, int has_chinese_buffer);
 
 /** Delete the last English character. Returns 1 if deleted, 0 if empty. */
 int qb_composing_backspace_english(QBComposingSession *session);

@@ -123,13 +123,25 @@ impl ComposingSession {
 
     // MARK: - English input
 
-    /// Type an English character into the composing buffer.
-    pub fn type_english(&mut self, ch: char) {
-        self.english_buffer.push(ch);
+    /// Type an English character.
+    ///
+    /// If `has_chinese_buffer` is true, the character goes into the mixed
+    /// composing buffer (segment tracking). If false, returns `true` to
+    /// indicate the caller should directly commit this character.
+    pub fn type_english(&mut self, ch: char, has_chinese_buffer: bool) -> bool {
         if self.shift_held {
             self.shift_typed_while_held = true;
             self.is_english = true;
         }
+
+        // No Chinese composing — direct commit, skip segment tracking
+        if !has_chinese_buffer && self.segments.is_empty() {
+            return true; // caller should commit directly
+        }
+
+        // Has Chinese context — add to mixed buffer
+        self.english_buffer.push(ch);
+        false // handled internally, don't direct commit
     }
 
     /// Delete the last English character. Returns true if there was something to delete.

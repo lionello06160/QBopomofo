@@ -118,12 +118,18 @@ final class ChewingBridge: ObservableObject {
     func handleKey(keyCode: UInt16, characters: String, shift: Bool = false) -> Bool {
         guard let ctx = ctx, let session = session else { return false }
 
-        // Shift held + typing → temporary English via Rust session
+        // Shift held + typing → English via Rust session
         if shift && qb_composing_is_shift_held(session) != 0 {
             if let ch = characters.first, ch.isASCII {
-                qb_composing_type_english(session, UInt8(ch.asciiValue ?? 0))
+                let hasChinese: Int32 = chewing_buffer_Len(ctx) > 0 ? 1 : 0
+                let directCommit = qb_composing_type_english(session, UInt8(ch.asciiValue ?? 0), hasChinese)
                 isEnglishMode = qb_composing_is_english(session) != 0
-                log("Key (temp English → 組字區): '\(ch)'")
+                if directCommit != 0 {
+                    committedText += String(ch)
+                    log("Key (temp English, direct): '\(ch)'")
+                } else {
+                    log("Key (temp English → 組字區): '\(ch)'")
+                }
                 updateState()
                 return true
             }
@@ -152,8 +158,14 @@ final class ChewingBridge: ObservableObject {
                 }
             }
             if let ch = characters.first, ch.isASCII, !ch.isNewline {
-                qb_composing_type_english(session, UInt8(ch.asciiValue ?? 0))
-                log("Key (English → 組字區): '\(ch)'")
+                let hasChinese: Int32 = chewing_buffer_Len(ctx) > 0 ? 1 : 0
+                let directCommit = qb_composing_type_english(session, UInt8(ch.asciiValue ?? 0), hasChinese)
+                if directCommit != 0 {
+                    committedText += String(ch)
+                    log("Key (English, direct): '\(ch)'")
+                } else {
+                    log("Key (English → 組字區): '\(ch)'")
+                }
                 updateState()
                 return true
             }

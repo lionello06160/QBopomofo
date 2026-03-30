@@ -96,11 +96,16 @@ class QBopomofoInputController: IMKInputController {
         // Pass through Command/Control
         if modifiers.contains(.command) || modifiers.contains(.control) { return false }
 
-        // Shift held + typing → temporary English
+        // Shift held + typing → English
         if shift && qb_composing_is_shift_held(session) != 0 {
             if let ch = chars.first, ch.isASCII {
-                qb_composing_type_english(session, UInt8(ch.asciiValue ?? 0))
-                updateClientDisplay(ctx: ctx, session: session, client: client)
+                let hasChinese: Int32 = chewing_buffer_Len(ctx) > 0 ? 1 : 0
+                let directCommit = qb_composing_type_english(session, UInt8(ch.asciiValue ?? 0), hasChinese)
+                if directCommit != 0 {
+                    client.insertText(String(ch), replacementRange: NSRange(location: NSNotFound, length: 0))
+                } else {
+                    updateClientDisplay(ctx: ctx, session: session, client: client)
+                }
                 return true
             }
         }
@@ -124,8 +129,13 @@ class QBopomofoInputController: IMKInputController {
                 }
             }
             if let ch = chars.first, ch.isASCII, !ch.isNewline {
-                qb_composing_type_english(session, UInt8(ch.asciiValue ?? 0))
-                updateClientDisplay(ctx: ctx, session: session, client: client)
+                let hasChinese: Int32 = chewing_buffer_Len(ctx) > 0 ? 1 : 0
+                let directCommit = qb_composing_type_english(session, UInt8(ch.asciiValue ?? 0), hasChinese)
+                if directCommit != 0 {
+                    client.insertText(String(ch), replacementRange: NSRange(location: NSNotFound, length: 0))
+                } else {
+                    updateClientDisplay(ctx: ctx, session: session, client: client)
+                }
                 return true
             }
         }
