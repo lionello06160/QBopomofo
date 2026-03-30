@@ -208,11 +208,14 @@ final class ChewingBridge: ObservableObject {
             }
         }
 
-        // If there's pending English text and user types Chinese, commit English first
-        if !inlineEnglishBuffer.isEmpty {
-            committedText += inlineEnglishBuffer
-            log("Auto-commit English buffer: \(inlineEnglishBuffer)")
-            inlineEnglishBuffer = ""
+        // English text stays in inlineEnglishBuffer — no auto-commit.
+        // Both Chinese and English will be committed together on Enter.
+
+        // Enter with mixed content — use commitAll to preserve order
+        if keyCode == 36 && !inlineEnglishBuffer.isEmpty {
+            commitAll()
+            log("Key: Enter (commit all: Chinese + English)")
+            return true
         }
 
         // Chinese mode — send to chewing engine
