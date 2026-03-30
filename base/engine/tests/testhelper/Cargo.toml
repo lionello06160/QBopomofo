@@ -1,0 +1,13 @@
+[package]
+name = "chewing_testhelper"
+version = "0.0.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+chewing = { version = "0.12.0-alpha.3", path = "../.." }
+
+[features]
+sqlite = ["chewing/sqlite"]
