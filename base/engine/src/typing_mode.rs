@@ -53,10 +53,12 @@ pub enum ConversionKind {
 pub enum ShiftBehavior {
     /// Shift does nothing special (default chewing behavior)
     None,
-    /// Shift toggles between Chinese and English input
-    ToggleChineseEnglish,
-    /// Shift enters temporary English mode (hold to type English, release to return)
-    TemporaryEnglish,
+    /// Smart Shift: short press toggles Chinese/English mode,
+    /// hold down for temporary English (release returns to Chinese).
+    /// This is the default for Q注音.
+    SmartToggle,
+    /// Shift only toggles between Chinese and English input (no hold behavior)
+    ToggleOnly,
 }
 
 /// What action Caps Lock performs in this mode.
@@ -91,7 +93,7 @@ pub struct ModePreferences {
 impl Default for ModePreferences {
     fn default() -> Self {
         Self {
-            shift_behavior: ShiftBehavior::ToggleChineseEnglish,
+            shift_behavior: ShiftBehavior::SmartToggle,
             caps_lock_behavior: CapsLockBehavior::None,
             candidates_per_page: 9,
             space_as_selection: true,
@@ -127,7 +129,7 @@ impl TypingMode {
             layout: KeyboardLayout::Standard,
             conversion: ConversionKind::Chewing,
             preferences: ModePreferences {
-                shift_behavior: ShiftBehavior::ToggleChineseEnglish,
+                shift_behavior: ShiftBehavior::SmartToggle,
                 caps_lock_behavior: CapsLockBehavior::None,
                 ..Default::default()
             },

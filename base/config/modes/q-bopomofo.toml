@@ -15,7 +15,7 @@ system = ["word.dat", "tsi.dat"]
 custom = ["phrases.csv"]
 
 [preferences]
-shift_behavior = "toggle_chinese_english"   # Shift 切換中英
+shift_behavior = "smart_toggle"   # 短按切換中英，長按暫時英文
 caps_lock_behavior = "none"                 # Caps Lock 不處理
 candidates_per_page = 9
 space_as_selection = true

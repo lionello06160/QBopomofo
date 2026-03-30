@@ -27,7 +27,7 @@ final class ChewingBridge: ObservableObject {
     /// Current typing mode
     @Published var currentMode: TypingModeSwift = .qBopomofo
     /// Per-mode preferences
-    @Published var shiftBehavior: ShiftBehaviorSwift = .toggleChineseEnglish
+    @Published var shiftBehavior: ShiftBehaviorSwift = .smartToggle
     @Published var capsLockBehavior: CapsLockBehaviorSwift = .none
     @Published var candidatesPerPage: Int = 9
     @Published var spaceAsSelection: Bool = true
@@ -334,7 +334,7 @@ enum TypingModeSwift: String, CaseIterable, Identifiable {
     /// Default Shift behavior for this mode
     var defaultShiftBehavior: ShiftBehaviorSwift {
         switch self {
-        case .qBopomofo: return .toggleChineseEnglish
+        case .qBopomofo: return .smartToggle
         default: return .none
         }
     }
@@ -349,16 +349,16 @@ enum TypingModeSwift: String, CaseIterable, Identifiable {
 
 enum ShiftBehaviorSwift: String, CaseIterable, Identifiable {
     case none
-    case toggleChineseEnglish
-    case temporaryEnglish
+    case smartToggle
+    case toggleOnly
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
         case .none: return "不處理"
-        case .toggleChineseEnglish: return "切換中/英"
-        case .temporaryEnglish: return "暫時英文（按住）"
+        case .smartToggle: return "智慧切換（短按切換，長按暫時英文）"
+        case .toggleOnly: return "僅切換中/英"
         }
     }
 }
