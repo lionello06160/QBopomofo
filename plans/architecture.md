@@ -283,7 +283,67 @@ data-provider ──→ chewing-data/ (本地 CSV)
 
 ---
 
-## 九、參考專案
+## 九、TypingMode 抽象架構
+
+### 概念
+
+TypingMode = 佈局 + 選字演算法 + 詞庫組合 + 自訂規則，打包成一個完整的輸入模式。
+
+引擎已有兩個 trait 擴展點：
+- `SyllableEditor` trait — 鍵盤佈局（按鍵 → 注音/拼音），位於 `src/editor/zhuyin_layout/`
+- `ConversionEngine` trait — 選字演算法（音 → 字），位於 `src/conversion/`
+
+TypingMode 在這之上加一層打包：
+
+```
+TypingMode
+├── keyboard_layout: SyllableEditor    # 按鍵 → 音（已有 trait）
+├── conversion: ConversionEngine       # 音 → 字（已有 trait）
+├── dictionaries: Vec<DictSource>      # 使用哪些詞庫
+├── custom_rules: Vec<Rule>            # 自訂詞頻/過濾規則
+└── metadata: ModeInfo                 # 名稱、描述、圖示
+```
+
+### 範例
+
+| Mode | 佈局 | 選字 | 詞庫 |
+|------|------|------|------|
+| 標準注音 | Standard (大千) | ChewingEngine | tsi.dat + phrases.csv |
+| 模糊注音 | Standard | FuzzyChewingEngine | tsi.dat + phrases.csv |
+| 許氏注音 | Hsu | ChewingEngine | tsi.dat + phrases.csv |
+
+### 用 TOML 定義 Mode（base/config/modes/）
+
+```toml
+[mode]
+id = "bopomofo-standard"
+name = "標準注音"
+
+[keyboard]
+layout = "standard"
+keymap = "qwerty"
+
+[conversion]
+engine = "chewing"
+
+[dictionaries]
+system = ["word.dat", "tsi.dat"]
+custom = ["phrases.csv"]
+```
+
+### 實作路徑
+
+- **Phase 1**：TOML 設定檔定義 modes，build.sh 根據設定選詞庫
+- **Phase 2**：引擎加 `TypingMode` struct，runtime 切換模式
+- **Phase 3**：支援自訂 SyllableEditor（如倉頡佈局）
+
+### 效能影響：零
+
+Mode 定義是 build-time 設定檔，runtime 只有已有的 trait dispatch。
+
+---
+
+## 十、參考專案
 
 | 專案 | 參考價值 |
 |------|---------|
