@@ -65,15 +65,13 @@ class QBopomofoInputController: IMKInputController {
         }
 
         composingSession = qb_composing_new()
-        qb_composing_set_shift_behavior(composingSession, 1) // SmartToggle
 
-        chewing_set_candPerPage(chewingContext, 9)
-        chewing_set_maxChiSymbolLen(chewingContext, 20)
-        chewing_set_spaceAsSelection(chewingContext, 1)
-        chewing_set_escCleanAllBuf(chewingContext, 1)
-        chewing_set_autoShiftCur(chewingContext, 1)
+        applyPreferences()
 
         dbg("Engine initialized")
+
+        // Listen for preference changes
+        NotificationCenter.default.addObserver(self, selector: #selector(preferencesDidChange), name: .qbopomofoPreferencesChanged, object: nil)
     }
 
     // MARK: - IMKStateSetting
@@ -88,6 +86,58 @@ class QBopomofoInputController: IMKInputController {
         commitComposition(sender)
         currentClient = nil
         dbg("Server deactivated")
+    }
+
+    // MARK: - Preferences
+
+    private func applyPreferences() {
+        guard let ctx = chewingContext, let session = composingSession else { return }
+        let defaults = UserDefaults.standard
+
+        let candPerPage = defaults.integer(forKey: "org.qbopomofo.candPerPage")
+        chewing_set_candPerPage(ctx, Int32(candPerPage > 0 ? candPerPage : 9))
+
+        let shiftBehavior = defaults.integer(forKey: "org.qbopomofo.shiftBehavior")
+        qb_composing_set_shift_behavior(session, shiftBehavior > 0 ? Int32(shiftBehavior) : 1)
+
+        chewing_set_maxChiSymbolLen(ctx, 20)
+        chewing_set_spaceAsSelection(ctx, 1)
+        chewing_set_escCleanAllBuf(ctx, 1)
+        chewing_set_autoShiftCur(ctx, 1)
+    }
+
+    @objc private func preferencesDidChange() {
+        applyPreferences()
+        dbg("Preferences reloaded")
+    }
+
+    // MARK: - Menu
+
+    override func menu() -> NSMenu! {
+        let menu = NSMenu()
+        let prefsItem = NSMenuItem(title: "偏好設定…", action: #selector(openPreferences(_:)), keyEquivalent: ",")
+        prefsItem.target = self
+        menu.addItem(prefsItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        let aboutItem = NSMenuItem(title: "關於 Q注音", action: #selector(openAbout(_:)), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
+
+        return menu
+    }
+
+    @objc func openPreferences(_ sender: Any?) {
+        PreferencesWindow.shared.showWindow()
+    }
+
+    @objc func openAbout(_ sender: Any?) {
+        let alert = NSAlert()
+        alert.messageText = "Q注音 QBopomofo"
+        alert.informativeText = "版本 0.1.0\nBuild: \(kBuildTimestamp)\n\n基於 libchewing 引擎的注音輸入法"
+        alert.alertStyle = .informational
+        alert.runModal()
     }
 
     // MARK: - IMKServerInput
@@ -125,8 +175,11 @@ class QBopomofoInputController: IMKInputController {
 
         dbg("key=\(keyCode) chars=\(chars)")
 
-        // Pass through Command/Control
+        // Pass through Command/Control and numpad keys
         if modifiers.contains(.command) || modifiers.contains(.control) { return false }
+        // Numpad digit keys (keyCodes 82-92) → pass through directly (not as bopomofo)
+        let numpadDigits: Set<UInt16> = [82,83,84,85,86,87,88,89,91,92] // 0-9 on numpad
+        if numpadDigits.contains(keyCode) { return false }
 
         // Shift held + typing → English (letters only; punctuation falls through to engine)
         if shift && qb_composing_is_shift_held(session) != 0 {
@@ -136,6 +189,7 @@ class QBopomofoInputController: IMKInputController {
                     qb_composing_type_english(session, UInt8(ch.asciiValue ?? 0), cStr)
                 }
                 if directCommit != 0 {
+                    dbg("insertText='\(ch)' [source:shiftEnglish]")
                     client.insertText(String(ch), replacementRange: NSRange(location: NSNotFound, length: 0))
                 } else {
                     updateClientDisplay(ctx: ctx, session: session, client: client)
@@ -155,7 +209,7 @@ class QBopomofoInputController: IMKInputController {
                 return true
             }
             if keyCode == 36 { // Enter
-                commitAll(ctx: ctx, session: session, client: client)
+                commitAll(ctx: ctx, session: session, client: client, source: "enterEnglish")
                 return true
             }
             if keyCode == 51 { // Backspace
@@ -171,6 +225,7 @@ class QBopomofoInputController: IMKInputController {
                     qb_composing_type_english(session, UInt8(Character(" ").asciiValue!), cStr)
                 }
                 if directCommit != 0 {
+                    dbg("insertText=' ' [source:englishSpace]")
                     client.insertText(" ", replacementRange: NSRange(location: NSNotFound, length: 0))
                 } else {
                     updateClientDisplay(ctx: ctx, session: session, client: client)
@@ -183,6 +238,7 @@ class QBopomofoInputController: IMKInputController {
                     qb_composing_type_english(session, UInt8(ch.asciiValue ?? 0), cStr)
                 }
                 if directCommit != 0 {
+                    dbg("insertText='\(ch)' [source:englishChar]")
                     client.insertText(String(ch), replacementRange: NSRange(location: NSNotFound, length: 0))
                 } else {
                     updateClientDisplay(ctx: ctx, session: session, client: client)
@@ -201,7 +257,7 @@ class QBopomofoInputController: IMKInputController {
 
         // Enter/Escape with mixed content
         if keyCode == 36 && qb_composing_has_mixed_content(session) != 0 {
-            commitAll(ctx: ctx, session: session, client: client)
+            commitAll(ctx: ctx, session: session, client: client, source: "enterMixed")
             return true
         }
         if keyCode == 53 && qb_composing_has_mixed_content(session) != 0 {
@@ -212,8 +268,7 @@ class QBopomofoInputController: IMKInputController {
         }
 
         // Candidate mode — intercept navigation keys
-        let inCandMode = chewing_cand_CheckDone(ctx) == 0 && chewing_cand_TotalPage(ctx) > 0
-        if inCandMode {
+        if inCandidateMode(ctx) {
             switch keyCode {
             case 125: // Down — next candidate
                 let candCount = getCandidateCount(ctx)
@@ -315,7 +370,7 @@ class QBopomofoInputController: IMKInputController {
         if chewing_commit_Check(ctx) != 0 {
             if let commitStr = chewing_commit_String(ctx) {
                 let text = String(cString: commitStr)
-                dbg("commit='\(text)'")
+                dbg("commit='\(text)' [source:updateDisplay]")
                 client.insertText(text, replacementRange: NSRange(location: NSNotFound, length: 0))
                 chewing_free(commitStr)
             }
@@ -344,7 +399,7 @@ class QBopomofoInputController: IMKInputController {
         // Auto-flush: composing display > 20 chars → commit all
         if !isAutoFlushing && display.count > 20 {
             isAutoFlushing = true
-            commitAll(ctx: ctx, session: session, client: client)
+            commitAll(ctx: ctx, session: session, client: client, source: "autoFlush")
             isAutoFlushing = false
             return
         }
@@ -376,7 +431,7 @@ class QBopomofoInputController: IMKInputController {
 
     // MARK: - Commit
 
-    private func commitAll(ctx: OpaquePointer, session: OpaquePointer, client: IMKTextInput) {
+    private func commitAll(ctx: OpaquePointer, session: OpaquePointer, client: IMKTextInput, source: String) {
         // Hide candidate window
         QBopomofoInputController.candidateWindow?.hide()
 
@@ -402,6 +457,7 @@ class QBopomofoInputController: IMKInputController {
         }
 
         if !result.isEmpty {
+            dbg("commitAll='\(result)' [source:\(source)]")
             client.insertText(result, replacementRange: NSRange(location: NSNotFound, length: 0))
         }
         client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
@@ -410,7 +466,8 @@ class QBopomofoInputController: IMKInputController {
     override func commitComposition(_ sender: Any!) {
         guard let ctx = chewingContext, let session = composingSession else { return }
         guard let client = sender as? IMKTextInput else { return }
-        commitAll(ctx: ctx, session: session, client: client)
+        dbg("commitComposition called")
+        commitAll(ctx: ctx, session: session, client: client, source: "commitComposition")
         chewing_Reset(ctx)
     }
 
@@ -464,6 +521,10 @@ class QBopomofoInputController: IMKInputController {
             return s
         }
         return ""
+    }
+
+    private func inCandidateMode(_ ctx: OpaquePointer) -> Bool {
+        chewing_cand_CheckDone(ctx) == 0 && chewing_cand_TotalPage(ctx) > 0
     }
 
     private func getCandidateCount(_ ctx: OpaquePointer) -> Int {

@@ -148,13 +148,25 @@ impl ComposingSession {
             return true; // caller should commit directly
         }
 
-        // First English char after Chinese — snapshot Chinese buffer first
+        // First English char after Chinese — snapshot only NEW Chinese content
         if has_chinese && self.english_buffer.is_empty() {
-            // Check if Chinese was already snapshotted
-            let already_snapshotted: String = self.segments.iter()
-                .filter_map(|s| if let Segment::Chinese(t) = s { Some(t.as_str()) } else { None })
+            let already: String = self
+                .segments
+                .iter()
+                .filter_map(|s| {
+                    if let Segment::Chinese(t) = s {
+                        Some(t.as_str())
+                    } else {
+                        None
+                    }
+                })
                 .collect();
-            if chinese_buffer != already_snapshotted {
+            if chinese_buffer.starts_with(&already) {
+                let delta = &chinese_buffer[already.len()..];
+                if !delta.is_empty() {
+                    self.segments.push(Segment::Chinese(delta.to_string()));
+                }
+            } else if already.is_empty() {
                 self.segments.push(Segment::Chinese(chinese_buffer.to_string()));
             }
         }
@@ -286,9 +298,27 @@ impl ComposingSession {
                 self.english_buffer.clear();
             }
         } else {
-            // Switching FROM Chinese → English: snapshot Chinese buffer
+            // Switching FROM Chinese → English: snapshot only NEW Chinese content
             if !chinese_buffer.is_empty() {
-                self.segments.push(Segment::Chinese(chinese_buffer.to_string()));
+                let already: String = self
+                    .segments
+                    .iter()
+                    .filter_map(|s| {
+                        if let Segment::Chinese(t) = s {
+                            Some(t.as_str())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                if chinese_buffer.starts_with(&already) {
+                    let delta = &chinese_buffer[already.len()..];
+                    if !delta.is_empty() {
+                        self.segments.push(Segment::Chinese(delta.to_string()));
+                    }
+                } else if already.is_empty() {
+                    self.segments.push(Segment::Chinese(chinese_buffer.to_string()));
+                }
                 self.chinese_snapshot = chinese_buffer.to_string();
             }
         }

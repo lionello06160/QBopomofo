@@ -59,6 +59,13 @@ cp "$DATA_DIR/tsi.dat" "$APP_BUNDLE/Contents/Resources/"
 cp "$DATA_DIR/symbols.dat" "$APP_BUNDLE/Contents/Resources/"
 cp "$DATA_DIR/swkb.dat" "$APP_BUNDLE/Contents/Resources/"
 
+# Localization
+for lproj in Base.lproj zh-Hant.lproj en.lproj; do
+    if [ -d "$SCRIPT_DIR/Resources/$lproj" ]; then
+        cp -R "$SCRIPT_DIR/Resources/$lproj" "$APP_BUNDLE/Contents/Resources/"
+    fi
+done
+
 # Step 6: Ad-hoc code sign
 echo "→ Code signing..."
 codesign --deep --force --sign - "$APP_BUNDLE" 2>/dev/null || {

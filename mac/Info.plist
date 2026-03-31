@@ -12,6 +12,11 @@
 	<string>org.qbopomofo.inputmethod.QBopomofo</string>
 	<key>CFBundleName</key>
 	<string>QBopomofo</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>zh-Hant</string>
+	</array>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
