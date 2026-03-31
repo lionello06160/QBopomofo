@@ -28,7 +28,9 @@ nonisolated(unsafe) private var correctionLogHandle: FileHandle? = {
     if !FileManager.default.fileExists(atPath: path) {
         FileManager.default.createFile(atPath: path, contents: nil)
     }
-    return FileHandle(forWritingAtPath: path)
+    let handle = FileHandle(forWritingAtPath: path)
+    handle?.seekToEndOfFile()
+    return handle
 }()
 
 private func logCorrection(_ entry: String) {
@@ -321,6 +323,13 @@ class QBopomofoInputController: IMKInputController {
             case 49: // Space — select current candidate
                 selectCandidateAndLog(ctx: ctx, session: session, client: client, index: candidatePanel.highlightedIndex, source: "space")
                 return true
+            case 51: // Backspace — close candidates and delete
+                chewing_cand_close(ctx)
+                candidatePanel.hidePanel()
+                chewing_handle_Backspace(ctx)
+                dbg("cand backspace → close and delete")
+                updateClientDisplay(ctx: ctx, session: session, client: client)
+                return true
             case 53: // Escape — close candidates
                 chewing_cand_close(ctx)
                 candidatePanel.hidePanel()
@@ -486,6 +495,7 @@ class QBopomofoInputController: IMKInputController {
             client.insertText(result, replacementRange: NSRange(location: NSNotFound, length: 0))
         }
         client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+        chewing_Reset(ctx)
     }
 
     override func commitComposition(_ sender: Any!) {
@@ -493,7 +503,6 @@ class QBopomofoInputController: IMKInputController {
         guard let client = sender as? IMKTextInput else { return }
         dbg("commitComposition called")
         commitAll(ctx: ctx, session: session, client: client, source: "commitComposition")
-        chewing_Reset(ctx)
     }
 
 
