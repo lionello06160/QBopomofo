@@ -286,9 +286,15 @@ class QBopomofoInputController: IMKInputController {
         // Candidate mode — custom CandidatePanel handles all navigation
         if isCandMode {
             switch keyCode {
-            case 125: // Down — next candidate
-                candidatePanel.highlightNext()
-                dbg("cand ↓ → idx=\(candidatePanel.highlightedIndex)")
+            case 125: // Down — next candidate, or shrink range at end
+                if !candidatePanel.highlightNext() {
+                    // At end of list — shrink selection range (phrase → single char)
+                    chewing_handle_Down(ctx)
+                    dbg("cand ↓ → end of list, shrink range")
+                    updateClientDisplay(ctx: ctx, session: session, client: client)
+                } else {
+                    dbg("cand ↓ → idx=\(candidatePanel.highlightedIndex)")
+                }
                 return true
             case 126: // Up — previous candidate
                 candidatePanel.highlightPrevious()
@@ -305,6 +311,11 @@ class QBopomofoInputController: IMKInputController {
             case 123: // Left — previous page
                 chewing_handle_Left(ctx)
                 dbg("cand page ← (page \(chewing_cand_CurrentPage(ctx)+1)/\(chewing_cand_TotalPage(ctx)))")
+                updateClientDisplay(ctx: ctx, session: session, client: client)
+                return true
+            case 48: // Tab — shrink selection range (phrase → single char)
+                chewing_handle_Down(ctx)
+                dbg("cand tab → shrink range (page \(chewing_cand_CurrentPage(ctx)+1)/\(chewing_cand_TotalPage(ctx)))")
                 updateClientDisplay(ctx: ctx, session: session, client: client)
                 return true
             case 49: // Space — select current candidate
