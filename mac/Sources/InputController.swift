@@ -294,7 +294,8 @@ class QBopomofoInputController: IMKInputController {
                 updateClientDisplay(ctx: ctx, session: session, client: client)
                 return true
             case 36, 49: // Enter or Space — select current candidate
-                let pageOffset = chewing_cand_CurrentPage(ctx) * 9
+                let perPage = chewing_get_candPerPage(ctx)
+                let pageOffset = chewing_cand_CurrentPage(ctx) * perPage
                 chewing_cand_choose_by_index(ctx, pageOffset + Int32(selectedCandidateIndex))
                 dbg("cand select: \(selectedCandidateIndex)")
                 selectedCandidateIndex = 0
@@ -310,7 +311,8 @@ class QBopomofoInputController: IMKInputController {
                 // Number keys 1-9 select directly
                 if let ch = chars.first, ch >= "1" && ch <= "9" {
                     let idx = Int(ch.asciiValue! - Character("1").asciiValue!)
-                    let pageOffset = chewing_cand_CurrentPage(ctx) * 9
+                    let perPage = chewing_get_candPerPage(ctx)
+                    let pageOffset = chewing_cand_CurrentPage(ctx) * perPage
                     chewing_cand_choose_by_index(ctx, pageOffset + Int32(idx))
                     dbg("cand select #\(idx + 1)")
                     selectedCandidateIndex = 0
