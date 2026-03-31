@@ -282,21 +282,19 @@ class QBopomofoInputController: IMKInputController {
                 QBopomofoInputController.candidateWindow?.selectCandidate(selectedCandidateIndex)
                 return true
             case 124: // Right — next page
-                chewing_cand_list_next(ctx)
+                chewing_handle_Right(ctx)
                 selectedCandidateIndex = 0
-                dbg("cand page →")
+                dbg("cand page → (page \(chewing_cand_CurrentPage(ctx)+1)/\(chewing_cand_TotalPage(ctx)))")
                 updateClientDisplay(ctx: ctx, session: session, client: client)
                 return true
             case 123: // Left — previous page
-                chewing_cand_list_prev(ctx)
+                chewing_handle_Left(ctx)
                 selectedCandidateIndex = 0
-                dbg("cand page ←")
+                dbg("cand page ← (page \(chewing_cand_CurrentPage(ctx)+1)/\(chewing_cand_TotalPage(ctx)))")
                 updateClientDisplay(ctx: ctx, session: session, client: client)
                 return true
             case 36, 49: // Enter or Space — select current candidate
-                let perPage = chewing_get_candPerPage(ctx)
-                let pageOffset = chewing_cand_CurrentPage(ctx) * perPage
-                chewing_cand_choose_by_index(ctx, pageOffset + Int32(selectedCandidateIndex))
+                chewing_cand_choose_by_index(ctx, Int32(selectedCandidateIndex))
                 dbg("cand select: \(selectedCandidateIndex)")
                 selectedCandidateIndex = 0
                 updateClientDisplay(ctx: ctx, session: session, client: client)
@@ -311,9 +309,7 @@ class QBopomofoInputController: IMKInputController {
                 // Number keys 1-9 select directly
                 if let ch = chars.first, ch >= "1" && ch <= "9" {
                     let idx = Int(ch.asciiValue! - Character("1").asciiValue!)
-                    let perPage = chewing_get_candPerPage(ctx)
-                    let pageOffset = chewing_cand_CurrentPage(ctx) * perPage
-                    chewing_cand_choose_by_index(ctx, pageOffset + Int32(idx))
+                    chewing_cand_choose_by_index(ctx, Int32(idx))
                     dbg("cand select #\(idx + 1)")
                     selectedCandidateIndex = 0
                     updateClientDisplay(ctx: ctx, session: session, client: client)
