@@ -209,6 +209,20 @@ class QBopomofoInputController: IMKInputController {
         let numpadDigits: Set<UInt16> = [82,83,84,85,86,87,88,89,91,92] // 0-9 on numpad
         if numpadDigits.contains(keyCode) && !isCandMode { return false }
 
+        // Nothing in buffer/bopomofo and not in candidate mode → pass through navigation keys
+        let hasContent = chewing_buffer_Len(ctx) > 0 || chewing_bopomofo_Check(ctx) != 0
+            || qb_composing_has_mixed_content(session) != 0
+        if !hasContent && !isCandMode {
+            let passthroughKeys: Set<UInt16> = [
+                36, 51, 117, 123, 124, 125, 126, 116, 121, 115, 119, 53, 48
+            ]
+            if passthroughKeys.contains(keyCode) { return false }
+            if keyCode == 49 { // Space → output space
+                client.insertText(" ", replacementRange: NSRange(location: NSNotFound, length: 0))
+                return true
+            }
+        }
+
         // Shift held + typing → English (letters only; punctuation falls through to engine)
         if shift && qb_composing_is_shift_held(session) != 0 {
             if let ch = chars.first, ch.isASCII, ch.isLetter {
@@ -353,30 +367,6 @@ class QBopomofoInputController: IMKInputController {
                     selectCandidateAndLog(ctx: ctx, session: session, client: client, index: idx, source: "#\(idx+1)")
                     return true
                 }
-            }
-        }
-
-        // No buffer and no bopomofo → pass through to app
-        if chewing_buffer_Len(ctx) == 0 && chewing_bopomofo_Check(ctx) == 0 {
-            let passthroughKeys: Set<UInt16> = [
-                36,  // Enter
-                51,  // Backspace
-                117, // Delete
-                123, // Left
-                124, // Right
-                125, // Down
-                126, // Up
-                116, // PageUp
-                121, // PageDown
-                115, // Home
-                119, // End
-                53,  // Escape
-                48,  // Tab
-            ]
-            if passthroughKeys.contains(keyCode) { return false }
-            if keyCode == 49 { // Space → output space
-                client.insertText(" ", replacementRange: NSRange(location: NSNotFound, length: 0))
-                return true
             }
         }
 
