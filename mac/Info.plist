@@ -10,6 +10,8 @@
 	<string>QBopomofo</string>
 	<key>CFBundleIdentifier</key>
 	<string>org.qbopomofo.inputmethod.QBopomofo</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleName</key>
 	<string>QBopomofo</string>
 	<key>CFBundleLocalizations</key>

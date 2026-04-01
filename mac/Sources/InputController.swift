@@ -2,28 +2,35 @@ import Cocoa
 @preconcurrency import InputMethodKit
 import CChewing
 
-/// Debug mode: writes to /tmp/qbopomofo.log when QBOPOMOFO_DEBUG env is set
+/// Debug mode: verbose console output when QBOPOMOFO_DEBUG env is set
 private let kDebugMode = ProcessInfo.processInfo.environment["QBOPOMOFO_DEBUG"] != nil
-nonisolated(unsafe) private var debugLogHandle: FileHandle? = {
-    guard kDebugMode else { return nil }
-    let path = "/tmp/qbopomofo.log"
-    FileManager.default.createFile(atPath: path, contents: nil)
-    return FileHandle(forWritingAtPath: path)
+
+/// Persistent log: always writes to date-stamped file in /tmp/ for diagnostics
+nonisolated(unsafe) private var persistentLogHandle: FileHandle? = {
+    let df = DateFormatter()
+    df.dateFormat = "yyyy-MM-dd"
+    let dateStr = df.string(from: Date())
+    let path = "/tmp/qbopomofo-\(dateStr).log"
+    if !FileManager.default.fileExists(atPath: path) {
+        FileManager.default.createFile(atPath: path, contents: nil)
+    }
+    let handle = FileHandle(forWritingAtPath: path)
+    handle?.seekToEndOfFile()
+    return handle
 }()
 
+
 private func dbg(_ msg: String) {
-    guard kDebugMode else { return }
     let ts = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
     let line = "[\(ts)] \(msg)\n"
     if let data = line.data(using: .utf8) {
-        debugLogHandle?.seekToEndOfFile()
-        debugLogHandle?.write(data)
+        persistentLogHandle?.seekToEndOfFile()
+        persistentLogHandle?.write(data)
     }
 }
 
-// Correction log: records candidate corrections for phrase tuning
+// Correction log: always records candidate corrections for phrase tuning
 nonisolated(unsafe) private var correctionLogHandle: FileHandle? = {
-    guard kDebugMode else { return nil }
     let path = "/tmp/qbopomofo-corrections.log"
     if !FileManager.default.fileExists(atPath: path) {
         FileManager.default.createFile(atPath: path, contents: nil)
@@ -34,7 +41,7 @@ nonisolated(unsafe) private var correctionLogHandle: FileHandle? = {
 }()
 
 private func logCorrection(_ entry: String) {
-    guard kDebugMode, let handle = correctionLogHandle else { return }
+    guard let handle = correctionLogHandle else { return }
     let ts = DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .medium)
     let line = "[\(ts)] \(entry)\n"
     if let data = line.data(using: .utf8) {
@@ -346,10 +353,28 @@ class QBopomofoInputController: IMKInputController {
             }
         }
 
-        // Chinese mode: space with no buffer → output space directly
-        if keyCode == 49 && chewing_buffer_Len(ctx) == 0 && chewing_bopomofo_Check(ctx) == 0 {
-            client.insertText(" ", replacementRange: NSRange(location: NSNotFound, length: 0))
-            return true
+        // No buffer and no bopomofo → pass through to app
+        if chewing_buffer_Len(ctx) == 0 && chewing_bopomofo_Check(ctx) == 0 {
+            let passthroughKeys: Set<UInt16> = [
+                36,  // Enter
+                51,  // Backspace
+                117, // Delete
+                123, // Left
+                124, // Right
+                125, // Down
+                126, // Up
+                116, // PageUp
+                121, // PageDown
+                115, // Home
+                119, // End
+                53,  // Escape
+                48,  // Tab
+            ]
+            if passthroughKeys.contains(keyCode) { return false }
+            if keyCode == 49 { // Space → output space
+                client.insertText(" ", replacementRange: NSRange(location: NSNotFound, length: 0))
+                return true
+            }
         }
 
         // Chinese mode — send to chewing engine
@@ -500,7 +525,15 @@ class QBopomofoInputController: IMKInputController {
 
     override func commitComposition(_ sender: Any!) {
         guard let ctx = chewingContext, let session = composingSession else { return }
-        guard let client = sender as? IMKTextInput else { return }
+        guard let client = sender as? IMKTextInput else {
+            dbg("commitComposition called (no client)")
+            return
+        }
+        // Skip if nothing to commit
+        if chewing_buffer_Len(ctx) == 0 && chewing_bopomofo_Check(ctx) == 0 {
+            dbg("commitComposition called (empty, skip)")
+            return
+        }
         dbg("commitComposition called")
         commitAll(ctx: ctx, session: session, client: client, source: "commitComposition")
     }

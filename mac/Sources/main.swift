@@ -28,11 +28,22 @@ guard server != nil else {
 
 NSLog("QBopomofo: Input method server started (build: %@, bundle: %@)", kBuildTimestamp, bundleID)
 
-// Write build info to debug log if enabled
-if ProcessInfo.processInfo.environment["QBOPOMOFO_DEBUG"] != nil {
-    let logPath = "/tmp/qbopomofo.log"
-    FileManager.default.createFile(atPath: logPath, contents: nil)
+// Persistent log: date-stamped file, append mode
+do {
+    let df = DateFormatter()
+    df.dateFormat = "yyyy-MM-dd"
+    let dateStr = df.string(from: Date())
+    let logPath = "/tmp/qbopomofo-\(dateStr).log"
+    if !FileManager.default.fileExists(atPath: logPath) {
+        FileManager.default.createFile(atPath: logPath, contents: nil)
+    }
+    // Symlink /tmp/qbopomofo.log → today's log for `tail -f`
+    let link = "/tmp/qbopomofo.log"
+    try? FileManager.default.removeItem(atPath: link)
+    try? FileManager.default.createSymbolicLink(atPath: link, withDestinationPath: logPath)
+
     if let fh = FileHandle(forWritingAtPath: logPath) {
+        fh.seekToEndOfFile()
         let msg = "[startup] QBopomofo build: \(kBuildTimestamp)\n"
         fh.write(msg.data(using: .utf8)!)
     }

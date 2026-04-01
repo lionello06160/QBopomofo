@@ -59,6 +59,10 @@ cp "$DATA_DIR/tsi.dat" "$APP_BUNDLE/Contents/Resources/"
 cp "$DATA_DIR/symbols.dat" "$APP_BUNDLE/Contents/Resources/"
 cp "$DATA_DIR/swkb.dat" "$APP_BUNDLE/Contents/Resources/"
 
+# Icons
+cp "$SCRIPT_DIR/Resources/QBopomofo.tiff" "$APP_BUNDLE/Contents/Resources/" 2>/dev/null
+cp "$SCRIPT_DIR/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/" 2>/dev/null
+
 # Localization
 for lproj in Base.lproj zh-Hant.lproj en.lproj; do
     if [ -d "$SCRIPT_DIR/Resources/$lproj" ]; then
