@@ -2,10 +2,13 @@ import Cocoa
 @preconcurrency import InputMethodKit
 import CChewing
 
-/// Debug mode: verbose console output when QBOPOMOFO_DEBUG env is set
+/// Debug mode: env var OR user preference
 private let kDebugMode = ProcessInfo.processInfo.environment["QBOPOMOFO_DEBUG"] != nil
+private var kPersistentLog: Bool {
+    kDebugMode || UserDefaults.standard.bool(forKey: "org.qbopomofo.persistentLog")
+}
 
-/// Persistent log: always writes to date-stamped file in /tmp/ for diagnostics
+/// Persistent log: writes to date-stamped file in /tmp/ when enabled
 nonisolated(unsafe) private var persistentLogHandle: FileHandle? = {
     let df = DateFormatter()
     df.dateFormat = "yyyy-MM-dd"
@@ -19,8 +22,8 @@ nonisolated(unsafe) private var persistentLogHandle: FileHandle? = {
     return handle
 }()
 
-
 private func dbg(_ msg: String) {
+    guard kPersistentLog else { return }
     let ts = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
     let line = "[\(ts)] \(msg)\n"
     if let data = line.data(using: .utf8) {
@@ -41,7 +44,7 @@ nonisolated(unsafe) private var correctionLogHandle: FileHandle? = {
 }()
 
 private func logCorrection(_ entry: String) {
-    guard let handle = correctionLogHandle else { return }
+    guard kPersistentLog, let handle = correctionLogHandle else { return }
     let ts = DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .medium)
     let line = "[\(ts)] \(entry)\n"
     if let data = line.data(using: .utf8) {

@@ -71,6 +71,13 @@ class PreferencesWindow: NSWindow {
         capsPopup.target = self
         capsPopup.action = #selector(capsLockChanged(_:))
         contentView.addSubview(capsPopup)
+        y -= 36
+
+        // Persistent logging
+        let logCheck = NSButton(checkboxWithTitle: "保留偵錯紀錄（/tmp/qbopomofo-*.log）", target: self, action: #selector(persistentLogChanged(_:)))
+        logCheck.frame = NSRect(x: 20, y: y, width: 360, height: 22)
+        logCheck.state = UserDefaults.standard.bool(forKey: "org.qbopomofo.persistentLog") ? .on : .off
+        contentView.addSubview(logCheck)
         y -= 50
 
         // Version info
@@ -99,6 +106,10 @@ class PreferencesWindow: NSWindow {
     @objc private func capsLockChanged(_ sender: NSPopUpButton) {
         UserDefaults.standard.set(sender.indexOfSelectedItem, forKey: "org.qbopomofo.capsLockBehavior")
         NotificationCenter.default.post(name: .qbopomofoPreferencesChanged, object: nil)
+    }
+
+    @objc private func persistentLogChanged(_ sender: NSButton) {
+        UserDefaults.standard.set(sender.state == .on, forKey: "org.qbopomofo.persistentLog")
     }
 
     func showWindow() {

@@ -28,8 +28,10 @@ guard server != nil else {
 
 NSLog("QBopomofo: Input method server started (build: %@, bundle: %@)", kBuildTimestamp, bundleID)
 
-// Persistent log: date-stamped file, append mode
-do {
+// Persistent log: date-stamped file, append mode (when env or preference enabled)
+let persistentLogEnabled = ProcessInfo.processInfo.environment["QBOPOMOFO_DEBUG"] != nil
+    || UserDefaults.standard.bool(forKey: "org.qbopomofo.persistentLog")
+if persistentLogEnabled {
     let df = DateFormatter()
     df.dateFormat = "yyyy-MM-dd"
     let dateStr = df.string(from: Date())
