@@ -402,8 +402,12 @@ class QBopomofoInputController: IMKInputController {
             }
         }
 
-        // Auto-flush: composing display > 20 chars → commit all
-        if !isAutoFlushing && display.count > 20 {
+        // Auto-flush for mixed content only (pure Chinese overflow is handled by the engine's maxChiSymbolLen).
+        // Only flush when no bopomofo is in progress to avoid clearing marked text mid-input,
+        // which causes garbled output in terminal emulators (iTerm2, CLI apps).
+        if !isAutoFlushing && display.count > 20
+            && qb_composing_has_mixed_content(session) != 0
+            && chewing_bopomofo_Check(ctx) == 0 {
             isAutoFlushing = true
             commitAll(ctx: ctx, session: session, client: client, source: "autoFlush")
             isAutoFlushing = false
