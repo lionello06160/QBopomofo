@@ -203,6 +203,239 @@ impl ComposingSession {
         false
     }
 
+    // MARK: - Cursor-aware editing
+
+    /// Compute the "remaining Chinese" portion of the display (chewing buffer minus snapshots).
+    fn remaining_chinese<'a>(&self, chinese_buffer: &'a str) -> &'a str {
+        let already: String = self
+            .segments
+            .iter()
+            .filter_map(|s| {
+                if let Segment::Chinese(t) = s {
+                    Some(t.as_str())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        if chinese_buffer.starts_with(&already) {
+            &chinese_buffer[already.len()..]
+        } else if !chinese_buffer.is_empty() {
+            chinese_buffer
+        } else {
+            ""
+        }
+    }
+
+    /// Query the region type at a given display cursor position.
+    ///
+    /// Returns: 0=Segment(Chinese), 1=Segment(English), 2=RemainingChinese,
+    ///          3=Bopomofo, 4=EnglishBuffer, -1=at/past end
+    pub fn cursor_region(&self, pos: usize, chinese_buffer: &str, bopomofo: &str) -> i32 {
+        match self.map_display_position(pos, chinese_buffer, bopomofo) {
+            Some((kind, _, _)) => kind as i32,
+            None => -1,
+        }
+    }
+
+    /// Convert a display cursor position to the corresponding chewing engine cursor position.
+    ///
+    /// For Chinese regions (Segment::Chinese or RemainingChinese), returns the character
+    /// offset within the chewing buffer. For non-Chinese regions, returns -1.
+    pub fn display_to_chewing_cursor(&self, pos: usize, chinese_buffer: &str, bopomofo: &str) -> i32 {
+        let mut offset = 0;
+        let mut chinese_chars_before = 0usize;
+
+        for seg in &self.segments {
+            let len = match seg {
+                Segment::Chinese(t) => {
+                    let char_count = t.chars().count();
+                    if pos < offset + char_count {
+                        // Inside this Chinese segment
+                        return (chinese_chars_before + (pos - offset)) as i32;
+                    }
+                    chinese_chars_before += char_count;
+                    char_count
+                }
+                Segment::English(t) => {
+                    let char_count = t.chars().count();
+                    if pos < offset + char_count {
+                        return -1; // In English region
+                    }
+                    char_count
+                }
+            };
+            offset += len;
+        }
+
+        // Remaining Chinese
+        let remaining = self.remaining_chinese(chinese_buffer);
+        let rem_len = remaining.chars().count();
+        if pos < offset + rem_len {
+            return (chinese_chars_before + (pos - offset)) as i32;
+        }
+        offset += rem_len;
+        chinese_chars_before += rem_len;
+
+        // Bopomofo — cursor here means at end of Chinese
+        let bopo_len = bopomofo.chars().count();
+        if pos < offset + bopo_len {
+            return chinese_chars_before as i32;
+        }
+
+        // At or past end — return total Chinese chars (cursor at end)
+        chinese_chars_before as i32
+    }
+
+    /// Map a display character position to a region in the underlying data structure.
+    /// Returns (region_type, segment_index_or_MAX, char_offset_within_region).
+    ///
+    /// region_type: 0=Segment(Chinese), 1=Segment(English), 2=RemainingChinese, 3=Bopomofo, 4=EnglishBuffer
+    fn map_display_position(
+        &self,
+        pos: usize,
+        chinese_buffer: &str,
+        bopomofo: &str,
+    ) -> Option<(u8, usize, usize)> {
+        let mut offset = 0;
+
+        for (i, seg) in self.segments.iter().enumerate() {
+            let (len, kind) = match seg {
+                Segment::Chinese(t) => (t.chars().count(), 0u8),
+                Segment::English(t) => (t.chars().count(), 1u8),
+            };
+            if pos < offset + len {
+                return Some((kind, i, pos - offset));
+            }
+            offset += len;
+        }
+
+        // Remaining Chinese
+        let remaining = self.remaining_chinese(chinese_buffer);
+        let rem_len = remaining.chars().count();
+        if pos < offset + rem_len {
+            return Some((2, usize::MAX, pos - offset));
+        }
+        offset += rem_len;
+
+        // Bopomofo
+        let bopo_len = bopomofo.chars().count();
+        if pos < offset + bopo_len {
+            return Some((3, usize::MAX, pos - offset));
+        }
+        offset += bopo_len;
+
+        // English buffer
+        let eng_len = self.english_buffer.chars().count();
+        if pos < offset + eng_len {
+            return Some((4, usize::MAX, pos - offset));
+        }
+
+        None // at or past end
+    }
+
+    /// Insert an English character at the given display cursor position.
+    /// Returns true if handled (cursor was in an English region).
+    pub fn insert_english_at(
+        &mut self,
+        ch: char,
+        cursor: usize,
+        chinese_buffer: &str,
+        bopomofo: &str,
+    ) -> bool {
+        match self.map_display_position(cursor, chinese_buffer, bopomofo) {
+            Some((1, seg_idx, char_offset)) => {
+                // English segment
+                if let Segment::English(ref mut text) = self.segments[seg_idx] {
+                    let byte_pos = text
+                        .char_indices()
+                        .nth(char_offset)
+                        .map(|(i, _)| i)
+                        .unwrap_or(text.len());
+                    text.insert(byte_pos, ch);
+                }
+                true
+            }
+            Some((4, _, char_offset)) => {
+                // English buffer
+                let byte_pos = self
+                    .english_buffer
+                    .char_indices()
+                    .nth(char_offset)
+                    .map(|(i, _)| i)
+                    .unwrap_or(self.english_buffer.len());
+                self.english_buffer.insert(byte_pos, ch);
+                true
+            }
+            None => {
+                // At end — append
+                self.english_buffer.push(ch);
+                true
+            }
+            _ => false, // Chinese or Bopomofo region
+        }
+    }
+
+    /// Delete the character before the given display cursor position.
+    /// Returns: 0 = nothing to delete, 1 = English char deleted, 2 = Chinese region (delegate to chewing).
+    pub fn delete_at(&mut self, cursor: usize, chinese_buffer: &str, bopomofo: &str) -> i32 {
+        if cursor == 0 {
+            return 0;
+        }
+        // Look at character BEFORE cursor
+        match self.map_display_position(cursor - 1, chinese_buffer, bopomofo) {
+            Some((1, seg_idx, char_offset)) => {
+                // English segment
+                if let Segment::English(ref mut text) = self.segments[seg_idx] {
+                    if let Some((bp, _)) = text.char_indices().nth(char_offset) {
+                        text.remove(bp);
+                    }
+                    if text.is_empty() {
+                        self.segments.remove(seg_idx);
+                        // Remove preceding Chinese snapshot (chewing buffer is source of truth)
+                        if seg_idx > 0 {
+                            if matches!(self.segments.get(seg_idx - 1), Some(Segment::Chinese(_))) {
+                                self.segments.remove(seg_idx - 1);
+                            }
+                        }
+                    }
+                }
+                1
+            }
+            Some((4, _, char_offset)) => {
+                // English buffer
+                if let Some((bp, _)) = self.english_buffer.char_indices().nth(char_offset) {
+                    self.english_buffer.remove(bp);
+                }
+                1
+            }
+            Some((0, _, _)) | Some((2, _, _)) | Some((3, _, _)) => 2, // Chinese or Bopomofo
+            _ => 0,
+        }
+    }
+
+    // MARK: - Resync
+
+    /// Re-synchronize Chinese segments after the chewing buffer has been modified
+    /// (e.g., by candidate selection). Each Chinese segment maps to a consecutive
+    /// slice of the chewing buffer; this method re-reads those slices from the
+    /// updated buffer so snapshots stay in sync.
+    pub fn resync_chinese(&mut self, new_chinese_buffer: &str) {
+        let mut chars_consumed = 0;
+        for seg in &mut self.segments {
+            if let Segment::Chinese(text) = seg {
+                let old_char_count = text.chars().count();
+                let new_text: String = new_chinese_buffer
+                    .chars()
+                    .skip(chars_consumed)
+                    .take(old_char_count)
+                    .collect();
+                *text = new_text;
+                chars_consumed += old_char_count;
+            }
+        }
+    }
+
     // MARK: - Commit
 
     /// Build the full display string from segments + current buffers.
