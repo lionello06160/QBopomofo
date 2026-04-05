@@ -27,6 +27,27 @@ QBopomofo/
 └── plans/               # 架構文件
 ```
 
+## macOS 安裝
+
+需求：
+
+- macOS 13 以上
+- Xcode Command Line Tools
+- Swift 6.1 以上
+- Rust toolchain
+
+安裝：
+
+```bash
+git clone https://github.com/lionello06160/QBopomofo.git
+cd QBopomofo/mac
+./install.sh
+```
+
+安裝完成後，到「系統設定 → 鍵盤 → 輸入方式 → +」加入 `Q注音`。
+
+如果是使用 Homebrew 安裝 Rust（特別是 Apple Silicon / `/opt/homebrew` 環境），目前 repo 已內建處理 Swift build plugin 的 PATH，不需要額外手動設定 `rustc` 路徑。
+
 ## 與上游的關係
 
 - `base/engine/` 的初始程式碼來自 libchewing，之後獨立發展，不再追蹤上游更新
