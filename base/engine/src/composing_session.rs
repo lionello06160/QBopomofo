@@ -410,6 +410,13 @@ impl ComposingSession {
                         self.segments.push(Segment::Chinese(remaining.to_string()));
                     }
                     self.segments.push(Segment::English(ch.to_string()));
+                } else if !self.segments.is_empty() {
+                    // Preserve insertion order after existing mixed segments.
+                    if let Some(Segment::English(text)) = self.segments.last_mut() {
+                        text.push(ch);
+                    } else {
+                        self.segments.push(Segment::English(ch.to_string()));
+                    }
                 } else {
                     // At end of an existing English buffer — append in place.
                     self.english_buffer.push(ch);
@@ -653,6 +660,18 @@ mod tests {
         assert_eq!(session.display_to_chewing_cursor(3, "甲乙", ""), 2);
         assert_eq!(session.build_display("甲乙丙丁", ""), "甲乙3丙丁");
         assert_eq!(session.commit_all("甲乙丙丁"), "甲乙3丙丁");
+    }
+
+    #[test]
+    fn insert_english_after_space_keeps_future_chinese_after_digit() {
+        let mut session = ComposingSession::new();
+
+        assert!(session.insert_english_at(' ', 2, "甲乙", ""));
+        assert!(session.insert_english_at('3', 3, "甲乙", ""));
+
+        assert_eq!(session.build_display("甲乙", ""), "甲乙 3");
+        assert_eq!(session.build_display("甲乙丙丁", ""), "甲乙 3丙丁");
+        assert_eq!(session.commit_all("甲乙丙丁"), "甲乙 3丙丁");
     }
 
     #[test]
