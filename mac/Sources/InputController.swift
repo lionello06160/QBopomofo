@@ -258,7 +258,16 @@ class QBopomofoInputController: IMKInputController {
 
         // Shift held + typing → English (letters only; punctuation falls through to engine)
         if shift && qb_composing_is_shift_held(session) != 0 {
-            if let ch = chars.first, ch.isASCII, ch.isLetter {
+            if var ch = chars.first, ch.isASCII, ch.isLetter {
+                // User requirement: Shift should not flip case, but follow Caps Lock state:
+                // Caps Lock OFF + Shift -> lowercase
+                // Caps Lock ON + Shift -> uppercase
+                if modifiers.contains(.capsLock) {
+                    ch = ch.uppercased().first ?? ch
+                } else {
+                    ch = ch.lowercased().first ?? ch
+                }
+
                 let chinBuf = getChewingBuffer(ctx)
                 let directCommit = chinBuf.withCString { cStr in
                     qb_composing_type_english(session, UInt8(ch.asciiValue ?? 0), cStr)
