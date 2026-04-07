@@ -81,6 +81,18 @@ char *qb_composing_commit_all(QBComposingSession *session, const char *final_chi
 void qb_composing_clear(QBComposingSession *session);
 
 /**
+ * Insert a string (e.g. full-width punctuation) at the given display cursor position.
+ * @param session current composing session.
+ * @param text UTF-8 string to insert.
+ * @param cursor display cursor position (character index).
+ * @param chinese_buffer current chewing buffer (UTF-8).
+ * @param bopomofo current bopomofo reading (UTF-8).
+ * @return 1 if handled.
+ */
+int qb_composing_insert_string_at_cursor(QBComposingSession *session, const char *text, int cursor,
+                                          const char *chinese_buffer, const char *bopomofo);
+
+/**
  * Insert an English character at a specific display cursor position (mixed content).
  * @param ch ASCII character to insert.
  * @param cursor display cursor position (character index).

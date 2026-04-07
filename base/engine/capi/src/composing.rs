@@ -181,6 +181,47 @@ pub extern "C" fn qb_composing_clear(session: *mut QBComposingSession) {
     s.inner.clear();
 }
 
+/// Insert a string (e.g. full-width punctuation) at the given display cursor position.
+/// Returns 1 if handled.
+#[unsafe(no_mangle)]
+pub extern "C" fn qb_composing_insert_string_at_cursor(
+    session: *mut QBComposingSession,
+    text: *const c_char,
+    cursor: i32,
+    chinese_buffer: *const c_char,
+    bopomofo: *const c_char,
+) -> i32 {
+    if session.is_null() || text.is_null() || cursor < 0 {
+        return 0;
+    }
+    let s = unsafe { &mut *session };
+    let text_str = unsafe { CStr::from_ptr(text) }.to_str().unwrap_or("");
+    let chinese = if chinese_buffer.is_null() {
+        ""
+    } else {
+        unsafe { CStr::from_ptr(chinese_buffer) }
+            .to_str()
+            .unwrap_or("")
+    };
+    let bopo = if bopomofo.is_null() {
+        ""
+    } else {
+        unsafe { CStr::from_ptr(bopomofo) }
+            .to_str()
+            .unwrap_or("")
+    };
+
+    let mut current_cursor = cursor as usize;
+    let mut handled = false;
+    for ch in text_str.chars() {
+        if s.inner.insert_english_at(ch, current_cursor, chinese, bopo) {
+            current_cursor += 1;
+            handled = true;
+        }
+    }
+    if handled { 1 } else { 0 }
+}
+
 /// Insert an English character at a specific display cursor position.
 /// Returns 1 if handled (English region), 0 if not (Chinese/bopomofo region).
 #[unsafe(no_mangle)]

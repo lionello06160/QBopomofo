@@ -830,8 +830,24 @@ class QBopomofoInputController: IMKInputController {
         }
 
         if let s = symbol {
-            commitAll(ctx: ctx, session: session, client: client, source: "ctrlSymbol")
-            client.insertText(s, replacementRange: NSRange(location: NSNotFound, length: 0))
+            let cursor = Int32(mixedDisplayCursor ?? lastDisplayCharCount)
+            let chinese = getChewingBuffer(ctx)
+            let bopo = getBopomofoString(ctx)
+            
+            s.withCString { symbolPtr in
+                chinese.withCString { chiPtr in
+                    bopo.withCString { bopoPtr in
+                        qb_composing_insert_string_at_cursor(session, symbolPtr, cursor, chiPtr, bopoPtr)
+                    }
+                }
+            }
+            
+            // Advance cursor if it was explicit
+            if let mcp = mixedDisplayCursor {
+                mixedDisplayCursor = mcp + 1
+            }
+            
+            updateClientDisplay(ctx: ctx, session: session, client: client)
             return true
         }
         return false
@@ -930,6 +946,15 @@ class QBopomofoInputController: IMKInputController {
         if chewing_buffer_Len(ctx) > 0, let bufStr = chewing_buffer_String(ctx) {
             let s = String(cString: bufStr)
             chewing_free(bufStr)
+            return s
+        }
+        return ""
+    }
+
+    private func getBopomofoString(_ ctx: OpaquePointer) -> String {
+        if chewing_bopomofo_Check(ctx) != 0, let bopoStr = chewing_bopomofo_String(ctx) {
+            let s = String(cString: bopoStr)
+            chewing_free(bopoStr)
             return s
         }
         return ""
