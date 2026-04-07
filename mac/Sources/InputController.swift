@@ -224,7 +224,14 @@ class QBopomofoInputController: IMKInputController {
         let isCandMode = inCandidateMode(ctx)
         dbg("key=\(keyCode) chars=\(chars) candMode=\(isCandMode)")
 
-        // Pass through Command/Control
+        // Handle special Control key combinations (e.g. Ctrl+, -> ，)
+        if (modifiers.contains(.control) || modifiers.contains(.option)) && !modifiers.contains(.command) {
+            if handleControlSymbols(keyCode: keyCode, client: client, ctx: ctx, session: session) {
+                return true
+            }
+        }
+
+        // Pass through Command/Control (except the ones handled above)
         if modifiers.contains(.command) || modifiers.contains(.control) { return false }
 
         // Nothing in buffer/bopomofo and not in candidate mode → pass through navigation keys
@@ -806,6 +813,28 @@ class QBopomofoInputController: IMKInputController {
         }
         dbg("commitComposition called")
         commitAll(ctx: ctx, session: session, client: client, source: "commitComposition")
+    }
+
+
+    private func handleControlSymbols(keyCode: UInt16, client: IMKTextInput, ctx: OpaquePointer, session: OpaquePointer) -> Bool {
+        let symbol: String?
+        switch keyCode {
+        case 43: symbol = "，" // ,
+        case 47: symbol = "。" // .
+        case 44: symbol = "？" // /
+        case 41: symbol = "；" // ;
+        case 39: symbol = "、" // '
+        case 33: symbol = "「" // [
+        case 30: symbol = "」" // ]
+        default: symbol = nil
+        }
+
+        if let s = symbol {
+            commitAll(ctx: ctx, session: session, client: client, source: "ctrlSymbol")
+            client.insertText(s, replacementRange: NSRange(location: NSNotFound, length: 0))
+            return true
+        }
+        return false
     }
 
 
