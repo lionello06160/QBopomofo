@@ -250,7 +250,7 @@ class QBopomofoInputController: IMKInputController {
         }
         if !hasContent && !isCandMode {
             let passthroughKeys: Set<UInt16> = [
-                36, 51, 117, 123, 124, 125, 126, 116, 121, 115, 119, 53, 48
+                36, 76, 51, 117, 123, 124, 125, 126, 116, 121, 115, 119, 53, 48
             ]
             if passthroughKeys.contains(keyCode) {
                 // Mark Shift as used so release won't toggle mode (e.g. Shift+Enter for newline)
@@ -299,7 +299,7 @@ class QBopomofoInputController: IMKInputController {
                 updateClientDisplay(ctx: ctx, session: session, client: client)
                 return true
             }
-            if keyCode == 36 { // Enter
+            if keyCode == 36 || keyCode == 76 { // Enter
                 mixedDisplayCursor = nil
                 commitAll(ctx: ctx, session: session, client: client, source: "enterEnglish")
                 return true
@@ -371,7 +371,7 @@ class QBopomofoInputController: IMKInputController {
         }
 
         // Enter/Escape with mixed content
-        if keyCode == 36 && qb_composing_has_mixed_content(session) != 0 && !isCandMode {
+        if (keyCode == 36 || keyCode == 76) && qb_composing_has_mixed_content(session) != 0 && !isCandMode {
             mixedDisplayCursor = nil
             commitAll(ctx: ctx, session: session, client: client, source: "enterMixed")
             return true
@@ -395,7 +395,7 @@ class QBopomofoInputController: IMKInputController {
                 candidatePanel.highlightPrevious()
                 dbg("cand ↑ → idx=\(candidatePanel.highlightedIndex)")
                 return true
-            case 36: // Enter — select current candidate
+            case 36, 76: // Enter — select current candidate
                 selectCandidateAndLog(ctx: ctx, session: session, client: client, index: candidatePanel.highlightedIndex, source: "enter")
                 return true
             case 124: // Right — next page
@@ -588,7 +588,7 @@ class QBopomofoInputController: IMKInputController {
         }
 
         switch keyCode {
-        case 36: chewing_handle_Enter(ctx); return true
+        case 36, 76: chewing_handle_Enter(ctx); return true
         case 51: chewing_handle_Backspace(ctx); return true
         case 53: chewing_handle_Esc(ctx); return true
         case 49: chewing_handle_Space(ctx); return true
