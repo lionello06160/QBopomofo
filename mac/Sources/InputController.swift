@@ -148,7 +148,7 @@ class QBopomofoInputController: IMKInputController {
         spaceCycleStep = 0
         spaceCycleSavedCursor = nil
 
-        chewing_set_maxChiSymbolLen(ctx, 20)
+        chewing_set_maxChiSymbolLen(ctx, 30)
         chewing_set_spaceAsSelection(ctx, 1)
         chewing_set_escCleanAllBuf(ctx, 1)
         chewing_set_autoShiftCur(ctx, 1)
@@ -683,8 +683,9 @@ class QBopomofoInputController: IMKInputController {
         // Auto-flush for mixed content only (pure Chinese overflow is handled by the engine's maxChiSymbolLen).
         // Only flush when no bopomofo is in progress to avoid clearing marked text mid-input,
         // which causes garbled output in terminal emulators (iTerm2, CLI apps).
-        if !isAutoFlushing && display.count > 20
+        if !isAutoFlushing && display.count > 30
             && qb_composing_has_mixed_content(session) != 0
+            && chewing_buffer_Len(ctx) >= 30
             && chewing_bopomofo_Check(ctx) == 0 {
             isAutoFlushing = true
             commitAll(ctx: ctx, session: session, client: client, source: "autoFlush")
