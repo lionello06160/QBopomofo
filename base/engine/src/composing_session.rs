@@ -460,7 +460,24 @@ impl ComposingSession {
                 }
                 1
             }
-            Some((0, _, _)) | Some((2, _, _)) | Some((3, _, _)) => 2, // Chinese or Bopomofo
+            Some((0, seg_idx, char_offset)) => {
+                // Chinese segment — update our snapshot before delegating to chewing
+                if let Segment::Chinese(ref mut text) = self.segments[seg_idx] {
+                    let byte_pos = text
+                        .char_indices()
+                        .nth(char_offset)
+                        .map(|(i, _)| i)
+                        .unwrap_or(text.len());
+                    text.remove(byte_pos);
+                    // If segment becomes empty, optionally remove it. 
+                    // But usually the following chewing delete will trigger a resync or re-snapshot anyway.
+                    if text.is_empty() {
+                        self.segments.remove(seg_idx);
+                    }
+                }
+                2
+            }
+            Some((2, _, _)) | Some((3, _, _)) => 2, // Remaining Chinese or Bopomofo
             _ => 0,
         }
     }
