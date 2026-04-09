@@ -114,6 +114,16 @@ int qb_composing_delete_at_cursor(QBComposingSession *session, int cursor,
                                    const char *chinese_buffer, const char *bopomofo);
 
 /**
+ * Delete the character at the given display cursor position (mixed content).
+ * @param cursor display cursor position (character index).
+ * @param chinese_buffer current chewing buffer (UTF-8).
+ * @param bopomofo current bopomofo reading (UTF-8).
+ * @return 0 = nothing, 1 = English char deleted, 2 = Chinese region (delegate to chewing).
+ */
+int qb_composing_delete_forward_at_cursor(QBComposingSession *session, int cursor,
+                                           const char *chinese_buffer, const char *bopomofo);
+
+/**
  * Query the region type at a given display cursor position.
  * @param cursor display cursor position (character index).
  * @param chinese_buffer current chewing buffer (UTF-8).

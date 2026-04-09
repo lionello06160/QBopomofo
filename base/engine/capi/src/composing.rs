@@ -287,6 +287,36 @@ pub extern "C" fn qb_composing_delete_at_cursor(
     s.inner.delete_at(cursor as usize, chinese, bopo)
 }
 
+/// Delete the character at the given display cursor position.
+/// Returns: 0 = nothing, 1 = English char deleted, 2 = Chinese/bopomofo region (delegate to chewing).
+#[unsafe(no_mangle)]
+pub extern "C" fn qb_composing_delete_forward_at_cursor(
+    session: *mut QBComposingSession,
+    cursor: i32,
+    chinese_buffer: *const c_char,
+    bopomofo: *const c_char,
+) -> i32 {
+    if session.is_null() || cursor < 0 {
+        return 0;
+    }
+    let s = unsafe { &mut *session };
+    let chinese = if chinese_buffer.is_null() {
+        ""
+    } else {
+        unsafe { CStr::from_ptr(chinese_buffer) }
+            .to_str()
+            .unwrap_or("")
+    };
+    let bopo = if bopomofo.is_null() {
+        ""
+    } else {
+        unsafe { CStr::from_ptr(bopomofo) }
+            .to_str()
+            .unwrap_or("")
+    };
+    s.inner.delete_forward_at(cursor as usize, chinese, bopo)
+}
+
 /// Query the region type at a given display cursor position.
 /// Returns: 0=Segment(Chinese), 1=Segment(English), 2=RemainingChinese,
 ///          3=Bopomofo, 4=EnglishBuffer, -1=at/past end

@@ -327,6 +327,22 @@ class QBopomofoInputController: IMKInputController {
                 // Chinese region or nothing: reset cursor, fall through to chewing
                 mixedDisplayCursor = nil
             }
+            if keyCode == 117 { // Delete
+                let curPos = mixedDisplayCursor ?? lastDisplayCharCount
+                let chinBuf = getChewingBuffer(ctx)
+                let bopo = getBopomofoReading(ctx)
+                let result = chinBuf.withCString { c in
+                    bopo.withCString { b in
+                        qb_composing_delete_forward_at_cursor(session, Int32(curPos), c, b)
+                    }
+                }
+                if result == 1 {
+                    dbg("english delete-forward at cursor \(curPos)")
+                    updateClientDisplay(ctx: ctx, session: session, client: client)
+                    return true
+                }
+                mixedDisplayCursor = nil
+            }
             // Space in English mode
             if keyCode == 49 {
                 return insertASCIIIntoComposition(" ", ctx: ctx, session: session, client: client, source: "englishSpace")
@@ -373,6 +389,43 @@ class QBopomofoInputController: IMKInputController {
 
                 mixedDisplayCursor = curPos > 0 ? curPos - 1 : 0
                 dbg("mixed delete chinese at cursor \(curPos) → chewing=\(chewCur) resync: '\(newBuf)'")
+                updateClientDisplay(ctx: ctx, session: session, client: client)
+                return true
+            }
+        }
+
+        // Delete with mixed content — cursor-aware forward delete (skip if in candidate mode)
+        if keyCode == 117 && qb_composing_has_mixed_content(session) != 0 && !isCandMode {
+            let curPos = mixedDisplayCursor ?? lastDisplayCharCount
+            let chinBuf = getChewingBuffer(ctx)
+            let bopo = getBopomofoReading(ctx)
+            let result = chinBuf.withCString { c in
+                bopo.withCString { b in
+                    qb_composing_delete_forward_at_cursor(session, Int32(curPos), c, b)
+                }
+            }
+            if result == 1 {
+                dbg("mixed delete-forward english at cursor \(curPos)")
+                updateClientDisplay(ctx: ctx, session: session, client: client)
+                return true
+            }
+            if result == 2 {
+                let chewCur = chinBuf.withCString { c in
+                    bopo.withCString { b in
+                        qb_composing_display_to_chewing_cursor(session, Int32(curPos), c, b)
+                    }
+                }
+                if chewCur >= 0 {
+                    syncChewingCursor(ctx: ctx, target: Int(chewCur))
+                }
+                chewing_handle_Del(ctx)
+
+                let newBuf = getChewingBuffer(ctx)
+                newBuf.withCString { c in
+                    qb_composing_resync_chinese(session, c)
+                }
+
+                dbg("mixed delete-forward chinese at cursor \(curPos) → chewing=\(chewCur) resync: '\(newBuf)'")
                 updateClientDisplay(ctx: ctx, session: session, client: client)
                 return true
             }
