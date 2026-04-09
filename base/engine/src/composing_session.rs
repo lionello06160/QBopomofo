@@ -486,6 +486,46 @@ impl ComposingSession {
         }
     }
 
+    /// Delete the character at the given display cursor position.
+    /// Returns: 0 = nothing to delete, 1 = English char deleted, 2 = Chinese region (delegate to chewing).
+    pub fn delete_forward_at(&mut self, cursor: usize, chinese_buffer: &str, bopomofo: &str) -> i32 {
+        match self.map_display_position(cursor, chinese_buffer, bopomofo) {
+            Some((1, seg_idx, char_offset)) => {
+                if let Segment::English(ref mut text) = self.segments[seg_idx] {
+                    if let Some((bp, _)) = text.char_indices().nth(char_offset) {
+                        text.remove(bp);
+                    }
+                    if text.is_empty() {
+                        self.segments.remove(seg_idx);
+                    }
+                }
+                1
+            }
+            Some((4, _, char_offset)) => {
+                if let Some((bp, _)) = self.english_buffer.char_indices().nth(char_offset) {
+                    self.english_buffer.remove(bp);
+                }
+                1
+            }
+            Some((0, seg_idx, char_offset)) => {
+                if let Segment::Chinese(ref mut text) = self.segments[seg_idx] {
+                    let byte_pos = text
+                        .char_indices()
+                        .nth(char_offset)
+                        .map(|(i, _)| i)
+                        .unwrap_or(text.len());
+                    text.remove(byte_pos);
+                    if text.is_empty() {
+                        self.segments.remove(seg_idx);
+                    }
+                }
+                2
+            }
+            Some((2, _, _)) | Some((3, _, _)) => 2,
+            _ => 0,
+        }
+    }
+
     // MARK: - Resync
 
     /// Re-synchronize Chinese segments after the chewing buffer has been modified
@@ -714,5 +754,28 @@ mod tests {
         assert_eq!(session.build_display("", "ㄅ"), "，ㄅ");
         assert_eq!(session.build_display("你好", ""), "，你好");
         assert_eq!(session.commit_all("你好"), "，你好");
+    }
+
+    #[test]
+    fn delete_forward_at_cursor_removes_selected_prefix_symbol() {
+        let mut session = ComposingSession::new();
+
+        assert!(session.insert_english_at('，', 0, "", ""));
+
+        assert_eq!(session.delete_forward_at(0, "你好", ""), 1);
+        assert_eq!(session.build_display("你好", ""), "你好");
+        assert_eq!(session.commit_all("你好"), "你好");
+    }
+
+    #[test]
+    fn delete_forward_at_cursor_removes_selected_english_in_middle() {
+        let mut session = ComposingSession::new();
+
+        assert!(session.insert_english_at('A', 1, "你好", ""));
+
+        assert_eq!(session.build_display("你好", ""), "你A好");
+        assert_eq!(session.delete_forward_at(1, "你好", ""), 1);
+        assert_eq!(session.build_display("你好", ""), "你好");
+        assert_eq!(session.commit_all("你好"), "你好");
     }
 }
