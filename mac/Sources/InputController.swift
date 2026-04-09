@@ -118,11 +118,13 @@ class QBopomofoInputController: IMKInputController {
     override func activateServer(_ sender: Any!) {
         currentClient = sender as? IMKTextInput
         if chewingContext == nil { initializeEngine() }
+        discardStaleActivationState()
         dbg("Server activated")
     }
 
     override func deactivateServer(_ sender: Any!) {
         commitComposition(sender)
+        resetTransientDisplayState()
         currentClient = nil
         dbg("Server deactivated")
     }
@@ -882,9 +884,13 @@ class QBopomofoInputController: IMKInputController {
             dbg("commitComposition called (no client)")
             return
         }
-        // Skip if nothing to commit
-        if chewing_buffer_Len(ctx) == 0 && chewing_bopomofo_Check(ctx) == 0 {
-            dbg("commitComposition called (empty, skip)")
+        if !hasPendingComposition(ctx: ctx, session: session) {
+            if lastMarkedUtf16Length > 0 {
+                dbg("commitComposition clearing stale marked text")
+                resetTransientDisplayState(client: client)
+            } else {
+                dbg("commitComposition called (empty, skip)")
+            }
             return
         }
         dbg("commitComposition called")
@@ -931,6 +937,48 @@ class QBopomofoInputController: IMKInputController {
 
 
     // MARK: - Helpers
+
+    private func hasPendingComposition(ctx: OpaquePointer, session: OpaquePointer) -> Bool {
+        chewing_buffer_Len(ctx) > 0
+            || chewing_bopomofo_Check(ctx) != 0
+            || qb_composing_has_mixed_content(session) != 0
+    }
+
+    private func resetTransientDisplayState(client: IMKTextInput? = nil) {
+        if let client, lastMarkedUtf16Length > 0 {
+            client.setMarkedText(
+                "",
+                selectionRange: NSRange(location: 0, length: 0),
+                replacementRange: NSRange(location: NSNotFound, length: lastMarkedUtf16Length)
+            )
+        }
+        if candidatePanel.isPanelVisible {
+            candidatePanel.hidePanel()
+        }
+        mixedDisplayCursor = nil
+        savedMixedCursor = nil
+        lastDisplayCharCount = 0
+        lastMarkedUtf16Length = 0
+        spaceCycleRemaining = spaceCycleMax
+        spaceCycleTargets = []
+        spaceCycleStep = 0
+        spaceCycleSavedCursor = nil
+    }
+
+    private func discardStaleActivationState() {
+        guard let ctx = chewingContext, let session = composingSession else { return }
+
+        let hasStaleComposition = hasPendingComposition(ctx: ctx, session: session)
+        let shiftWasLeftHeld = qb_composing_is_shift_held(session) != 0
+
+        if hasStaleComposition || shiftWasLeftHeld {
+            dbg("Discarding stale activation state pending=\(hasStaleComposition) shiftHeld=\(shiftWasLeftHeld)")
+            chewing_Reset(ctx)
+            qb_composing_clear(session)
+        }
+
+        resetTransientDisplayState()
+    }
 
     /// Move the chewing engine cursor to the target position by sending Left/Right keys.
     private func syncChewingCursor(ctx: OpaquePointer, target: Int) {
