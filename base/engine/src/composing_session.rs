@@ -417,6 +417,10 @@ impl ComposingSession {
                     } else {
                         self.segments.push(Segment::English(ch.to_string()));
                     }
+                } else if self.english_buffer.is_empty() {
+                    // Cursor-aware insertion at an empty display must become a fixed
+                    // segment so later Chinese/bopomofo stays after the inserted text.
+                    self.segments.push(Segment::English(ch.to_string()));
                 } else {
                     // At end of an existing English buffer — append in place.
                     self.english_buffer.push(ch);
@@ -699,5 +703,16 @@ mod tests {
 
         assert_eq!(session.build_display("你好", "ㄅ"), "你好3ㄅ");
         assert_eq!(session.display_to_chewing_cursor(3, "你好", "ㄅ"), 2);
+    }
+
+    #[test]
+    fn insert_english_at_empty_state_keeps_later_input_after_prefix_symbol() {
+        let mut session = ComposingSession::new();
+
+        assert!(session.insert_english_at('，', 0, "", ""));
+
+        assert_eq!(session.build_display("", "ㄅ"), "，ㄅ");
+        assert_eq!(session.build_display("你好", ""), "，你好");
+        assert_eq!(session.commit_all("你好"), "，你好");
     }
 }
