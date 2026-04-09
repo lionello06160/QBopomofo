@@ -314,7 +314,7 @@ class QBopomofoInputController: IMKInputController {
                 let bopo = getBopomofoReading(ctx)
                 let result = chinBuf.withCString { c in
                     bopo.withCString { b in
-                        qb_composing_delete_at_cursor(session, Int32(curPos), c, b)
+                        qb_composing_delete_at_cursor(session, Int32(curPos), c, b, Int32(chewing_cursor_Current(ctx)))
                     }
                 }
                 if result == 1 {
@@ -333,7 +333,7 @@ class QBopomofoInputController: IMKInputController {
                 let bopo = getBopomofoReading(ctx)
                 let result = chinBuf.withCString { c in
                     bopo.withCString { b in
-                        qb_composing_delete_forward_at_cursor(session, Int32(curPos), c, b)
+                        qb_composing_delete_forward_at_cursor(session, Int32(curPos), c, b, Int32(chewing_cursor_Current(ctx)))
                     }
                 }
                 if result == 1 {
@@ -359,7 +359,7 @@ class QBopomofoInputController: IMKInputController {
             let bopo = getBopomofoReading(ctx)
             let result = chinBuf.withCString { c in
                 bopo.withCString { b in
-                    qb_composing_delete_at_cursor(session, Int32(curPos), c, b)
+                    qb_composing_delete_at_cursor(session, Int32(curPos), c, b, Int32(chewing_cursor_Current(ctx)))
                 }
             }
             if result == 1 {
@@ -373,7 +373,7 @@ class QBopomofoInputController: IMKInputController {
                 // Chinese region — sync chewing cursor and let engine handle backspace
                 let chewCur = chinBuf.withCString { c in
                     bopo.withCString { b in
-                        qb_composing_display_to_chewing_cursor(session, Int32(curPos), c, b)
+                        qb_composing_display_to_chewing_cursor(session, Int32(curPos), c, b, Int32(chewing_cursor_Current(ctx)))
                     }
                 }
                 if chewCur >= 0 {
@@ -401,7 +401,7 @@ class QBopomofoInputController: IMKInputController {
             let bopo = getBopomofoReading(ctx)
             let result = chinBuf.withCString { c in
                 bopo.withCString { b in
-                    qb_composing_delete_forward_at_cursor(session, Int32(curPos), c, b)
+                    qb_composing_delete_forward_at_cursor(session, Int32(curPos), c, b, Int32(chewing_cursor_Current(ctx)))
                 }
             }
             if result == 1 {
@@ -412,7 +412,7 @@ class QBopomofoInputController: IMKInputController {
             if result == 2 {
                 let chewCur = chinBuf.withCString { c in
                     bopo.withCString { b in
-                        qb_composing_display_to_chewing_cursor(session, Int32(curPos), c, b)
+                        qb_composing_display_to_chewing_cursor(session, Int32(curPos), c, b, Int32(chewing_cursor_Current(ctx)))
                     }
                 }
                 if chewCur >= 0 {
@@ -519,9 +519,15 @@ class QBopomofoInputController: IMKInputController {
         if qb_composing_has_mixed_content(session) != 0, let curPos = mixedDisplayCursor {
             let chinBuf = getChewingBuffer(ctx)
             let bopo = getBopomofoReading(ctx)
+            let currentChewingCursor = Int32(chewing_cursor_Current(ctx))
+            chinBuf.withCString { c in
+                bopo.withCString { b in
+                    qb_composing_prepare_chinese_input_at_cursor(session, Int32(curPos), c, b, currentChewingCursor)
+                }
+            }
             let chewCur = chinBuf.withCString { c in
                 bopo.withCString { b in
-                    qb_composing_display_to_chewing_cursor(session, Int32(curPos), c, b)
+                    qb_composing_display_to_chewing_cursor(session, Int32(curPos), c, b, currentChewingCursor)
                 }
             }
             if chewCur >= 0 {
@@ -737,7 +743,7 @@ class QBopomofoInputController: IMKInputController {
         } else {
             display = chinese.withCString { chinBuf in
                 bopomofo.withCString { bopoBuf -> String in
-                    if let ptr = qb_composing_build_display(session, chinBuf, bopoBuf) {
+                    if let ptr = qb_composing_build_display(session, chinBuf, bopoBuf, Int32(chewingCursor)) {
                         let s = String(cString: ptr)
                         chewing_free(ptr)
                         return s
@@ -913,7 +919,7 @@ class QBopomofoInputController: IMKInputController {
             s.withCString { symbolPtr in
                 chinese.withCString { chiPtr in
                     bopo.withCString { bopoPtr in
-                        qb_composing_insert_string_at_cursor(session, symbolPtr, cursor, chiPtr, bopoPtr)
+                        qb_composing_insert_string_at_cursor(session, symbolPtr, cursor, chiPtr, bopoPtr, Int32(chewing_cursor_Current(ctx)))
                     }
                 }
             }
@@ -992,7 +998,7 @@ class QBopomofoInputController: IMKInputController {
         if let curPos = preferredInsertCursor(ctx: ctx, session: session) {
             let handled = chinBuf.withCString { c in
                 bopo.withCString { b in
-                    qb_composing_insert_at_cursor(session, ascii, Int32(curPos), c, b)
+                    qb_composing_insert_at_cursor(session, ascii, Int32(curPos), c, b, Int32(chewing_cursor_Current(ctx)))
                 }
             }
             if handled != 0 {

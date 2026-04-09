@@ -66,9 +66,10 @@ char *qb_composing_english_buffer(const QBComposingSession *session);
  * Build the full display string from segments + current buffers.
  * @param chinese_buffer current chewing buffer (UTF-8).
  * @param bopomofo current bopomofo reading (UTF-8).
+ * @param chewing_cursor current chewing cursor position (character index).
  * @return UTF-8 string. Caller must free with chewing_free().
  */
-char *qb_composing_build_display(const QBComposingSession *session, const char *chinese_buffer, const char *bopomofo);
+char *qb_composing_build_display(const QBComposingSession *session, const char *chinese_buffer, const char *bopomofo, int chewing_cursor);
 
 /**
  * Commit all content in correct order.
@@ -87,10 +88,11 @@ void qb_composing_clear(QBComposingSession *session);
  * @param cursor display cursor position (character index).
  * @param chinese_buffer current chewing buffer (UTF-8).
  * @param bopomofo current bopomofo reading (UTF-8).
+ * @param chewing_cursor current chewing cursor position (character index).
  * @return 1 if handled.
  */
 int qb_composing_insert_string_at_cursor(QBComposingSession *session, const char *text, int cursor,
-                                          const char *chinese_buffer, const char *bopomofo);
+                                          const char *chinese_buffer, const char *bopomofo, int chewing_cursor);
 
 /**
  * Insert an English character at a specific display cursor position (mixed content).
@@ -98,51 +100,63 @@ int qb_composing_insert_string_at_cursor(QBComposingSession *session, const char
  * @param cursor display cursor position (character index).
  * @param chinese_buffer current chewing buffer (UTF-8).
  * @param bopomofo current bopomofo reading (UTF-8).
+ * @param chewing_cursor current chewing cursor position (character index).
  * @return 1 if handled (English region), 0 if not (Chinese/bopomofo region).
  */
 int qb_composing_insert_at_cursor(QBComposingSession *session, uint8_t ch, int cursor,
-                                   const char *chinese_buffer, const char *bopomofo);
+                                   const char *chinese_buffer, const char *bopomofo, int chewing_cursor);
 
 /**
  * Delete the character before the given display cursor position (mixed content).
  * @param cursor display cursor position (character index).
  * @param chinese_buffer current chewing buffer (UTF-8).
  * @param bopomofo current bopomofo reading (UTF-8).
+ * @param chewing_cursor current chewing cursor position (character index).
  * @return 0 = nothing, 1 = English char deleted, 2 = Chinese region (delegate to chewing).
  */
 int qb_composing_delete_at_cursor(QBComposingSession *session, int cursor,
-                                   const char *chinese_buffer, const char *bopomofo);
+                                   const char *chinese_buffer, const char *bopomofo, int chewing_cursor);
 
 /**
  * Delete the character at the given display cursor position (mixed content).
  * @param cursor display cursor position (character index).
  * @param chinese_buffer current chewing buffer (UTF-8).
  * @param bopomofo current bopomofo reading (UTF-8).
+ * @param chewing_cursor current chewing cursor position (character index).
  * @return 0 = nothing, 1 = English char deleted, 2 = Chinese region (delegate to chewing).
  */
 int qb_composing_delete_forward_at_cursor(QBComposingSession *session, int cursor,
-                                           const char *chinese_buffer, const char *bopomofo);
+                                           const char *chinese_buffer, const char *bopomofo, int chewing_cursor);
 
 /**
  * Query the region type at a given display cursor position.
  * @param cursor display cursor position (character index).
  * @param chinese_buffer current chewing buffer (UTF-8).
  * @param bopomofo current bopomofo reading (UTF-8).
+ * @param chewing_cursor current chewing cursor position (character index).
  * @return 0=Chinese(segment), 1=English(segment), 2=RemainingChinese,
  *         3=Bopomofo, 4=EnglishBuffer, -1=at/past end
  */
 int qb_composing_cursor_region(const QBComposingSession *session, int cursor,
-                                const char *chinese_buffer, const char *bopomofo);
+                                const char *chinese_buffer, const char *bopomofo, int chewing_cursor);
 
 /**
  * Convert a display cursor position to the corresponding chewing engine cursor position.
  * @param cursor display cursor position (character index).
  * @param chinese_buffer current chewing buffer (UTF-8).
  * @param bopomofo current bopomofo reading (UTF-8).
- * @return chewing cursor index, or -1 if the position is not in a Chinese region.
+ * @param chewing_cursor current chewing cursor position (character index).
+ * @return chewing cursor index for the insertion point represented by the display cursor.
  */
 int qb_composing_display_to_chewing_cursor(const QBComposingSession *session, int cursor,
-                                            const char *chinese_buffer, const char *bopomofo);
+                                            const char *chinese_buffer, const char *bopomofo, int chewing_cursor);
+
+/**
+ * Reposition the live chewing buffer to the given display cursor before Chinese input.
+ * This preserves later English segments so new Chinese stays at the cursor position.
+ */
+void qb_composing_prepare_chinese_input_at_cursor(QBComposingSession *session, int cursor,
+                                                   const char *chinese_buffer, const char *bopomofo, int chewing_cursor);
 
 /**
  * Re-synchronize Chinese segments after chewing buffer changed (e.g. candidate selection).

@@ -35,6 +35,10 @@ pub struct ComposingSession {
     segments: Vec<Segment>,
     /// Chinese buffer snapshot when last switched to English
     chinese_snapshot: String,
+    /// Segment index where the live chewing buffer should be rendered.
+    /// All snapshotted Chinese before this index stay before the live buffer,
+    /// and all snapshotted Chinese at/after this index stay after it.
+    live_chinese_insert_index: usize,
     /// Shift key state for SmartToggle
     shift_held: bool,
     /// Whether any key was typed while Shift was held
@@ -50,6 +54,7 @@ impl ComposingSession {
             english_buffer: String::new(),
             segments: Vec::with_capacity(8),
             chinese_snapshot: String::new(),
+            live_chinese_insert_index: usize::MAX,
             shift_held: false,
             shift_typed_while_held: false,
             was_chinese_before_shift: true,
@@ -205,34 +210,64 @@ impl ComposingSession {
 
     // MARK: - Cursor-aware editing
 
-    /// Compute the "remaining Chinese" portion of the display (chewing buffer minus snapshots).
-    fn remaining_chinese<'a>(&self, chinese_buffer: &'a str) -> &'a str {
-        let already: String = self
-            .segments
+    fn live_insert_index(&self) -> usize {
+        self.live_chinese_insert_index.min(self.segments.len())
+    }
+
+    fn chinese_snapshot_before_live(&self) -> String {
+        self.segments[..self.live_insert_index()]
             .iter()
-            .filter_map(|s| {
-                if let Segment::Chinese(t) = s {
-                    Some(t.as_str())
-                } else {
-                    None
-                }
+            .filter_map(|s| match s {
+                Segment::Chinese(t) => Some(t.as_str()),
+                Segment::English(_) => None,
             })
-            .collect();
-        if chinese_buffer.starts_with(&already) {
-            &chinese_buffer[already.len()..]
-        } else if !chinese_buffer.is_empty() {
-            chinese_buffer
-        } else {
-            ""
+            .collect()
+    }
+
+    fn chinese_snapshot_after_live(&self) -> String {
+        self.segments[self.live_insert_index()..]
+            .iter()
+            .filter_map(|s| match s {
+                Segment::Chinese(t) => Some(t.as_str()),
+                Segment::English(_) => None,
+            })
+            .collect()
+    }
+
+    fn remaining_chinese(&self, chinese_buffer: &str) -> String {
+        let prefix = self.chinese_snapshot_before_live();
+        let suffix = self.chinese_snapshot_after_live();
+
+        if let Some(rest) = chinese_buffer.strip_prefix(&prefix) {
+            if suffix.is_empty() {
+                return rest.to_string();
+            }
+            if let Some(middle) = rest.strip_suffix(&suffix) {
+                return middle.to_string();
+            }
         }
+
+        if chinese_buffer.is_empty() {
+            String::new()
+        } else {
+            chinese_buffer.to_string()
+        }
+    }
+
+    fn split_live_chinese(&self, chinese_buffer: &str, chewing_cursor: usize) -> (String, String, usize) {
+        let live = self.remaining_chinese(chinese_buffer);
+        let prefix_chars = self.chinese_snapshot_before_live().chars().count();
+        let live_cursor = chewing_cursor.saturating_sub(prefix_chars).min(live.chars().count());
+        let (before, after) = Self::split_at_char(&live, live_cursor);
+        (before, after, live_cursor)
     }
 
     /// Query the region type at a given display cursor position.
     ///
     /// Returns: 0=Segment(Chinese), 1=Segment(English), 2=RemainingChinese,
     ///          3=Bopomofo, 4=EnglishBuffer, -1=at/past end
-    pub fn cursor_region(&self, pos: usize, chinese_buffer: &str, bopomofo: &str) -> i32 {
-        match self.map_display_position(pos, chinese_buffer, bopomofo) {
+    pub fn cursor_region(&self, pos: usize, chinese_buffer: &str, bopomofo: &str, chewing_cursor: usize) -> i32 {
+        match self.map_display_position(pos, chinese_buffer, bopomofo, chewing_cursor) {
             Some((kind, _, _)) => kind as i32,
             None => -1,
         }
@@ -242,16 +277,39 @@ impl ComposingSession {
     ///
     /// For Chinese regions (Segment::Chinese or RemainingChinese), returns the character
     /// offset within the chewing buffer. For non-Chinese regions, returns -1.
-    pub fn display_to_chewing_cursor(&self, pos: usize, chinese_buffer: &str, bopomofo: &str) -> i32 {
+    pub fn display_to_chewing_cursor(&self, pos: usize, chinese_buffer: &str, bopomofo: &str, chewing_cursor: usize) -> i32 {
+        let insert_idx = self.live_insert_index();
+        let (live_before, live_after, _) = self.split_live_chinese(chinese_buffer, chewing_cursor);
         let mut offset = 0;
         let mut chinese_chars_before = 0usize;
 
-        for seg in &self.segments {
+        for (index, seg) in self.segments.iter().enumerate() {
+            if index == insert_idx {
+                let live_before_count = live_before.chars().count();
+                if pos < offset + live_before_count {
+                    return (chinese_chars_before + (pos - offset)) as i32;
+                }
+                offset += live_before_count;
+                chinese_chars_before += live_before_count;
+
+                let bopo_len = bopomofo.chars().count();
+                if pos < offset + bopo_len {
+                    return chinese_chars_before as i32;
+                }
+                offset += bopo_len;
+
+                let live_after_count = live_after.chars().count();
+                if pos < offset + live_after_count {
+                    return (chinese_chars_before + (pos - offset)) as i32;
+                }
+                offset += live_after_count;
+                chinese_chars_before += live_after_count;
+            }
+
             let len = match seg {
                 Segment::Chinese(t) => {
                     let char_count = t.chars().count();
                     if pos < offset + char_count {
-                        // Inside this Chinese segment
                         return (chinese_chars_before + (pos - offset)) as i32;
                     }
                     chinese_chars_before += char_count;
@@ -260,7 +318,7 @@ impl ComposingSession {
                 Segment::English(t) => {
                     let char_count = t.chars().count();
                     if pos < offset + char_count {
-                        return -1; // In English region
+                        return chinese_chars_before as i32;
                     }
                     char_count
                 }
@@ -268,22 +326,25 @@ impl ComposingSession {
             offset += len;
         }
 
-        // Remaining Chinese
-        let remaining = self.remaining_chinese(chinese_buffer);
-        let rem_len = remaining.chars().count();
-        if pos < offset + rem_len {
+        let live_before_count = live_before.chars().count();
+        if pos < offset + live_before_count {
             return (chinese_chars_before + (pos - offset)) as i32;
         }
-        offset += rem_len;
-        chinese_chars_before += rem_len;
+        offset += live_before_count;
+        chinese_chars_before += live_before_count;
 
-        // Bopomofo — cursor here means at end of Chinese
         let bopo_len = bopomofo.chars().count();
         if pos < offset + bopo_len {
             return chinese_chars_before as i32;
         }
+        offset += bopo_len;
 
-        // At or past end — return total Chinese chars (cursor at end)
+        let live_after_count = live_after.chars().count();
+        if pos < offset + live_after_count {
+            return (chinese_chars_before + (pos - offset)) as i32;
+        }
+        chinese_chars_before += live_after_count;
+
         chinese_chars_before as i32
     }
 
@@ -296,10 +357,33 @@ impl ComposingSession {
         pos: usize,
         chinese_buffer: &str,
         bopomofo: &str,
+        chewing_cursor: usize,
     ) -> Option<(u8, usize, usize)> {
+        let insert_idx = self.live_insert_index();
+        let (live_before, live_after, live_cursor) = self.split_live_chinese(chinese_buffer, chewing_cursor);
         let mut offset = 0;
 
         for (i, seg) in self.segments.iter().enumerate() {
+            if i == insert_idx {
+                let live_before_len = live_before.chars().count();
+                if pos < offset + live_before_len {
+                    return Some((2, usize::MAX, pos - offset));
+                }
+                offset += live_before_len;
+
+                let bopo_len = bopomofo.chars().count();
+                if pos < offset + bopo_len {
+                    return Some((3, usize::MAX, pos - offset));
+                }
+                offset += bopo_len;
+
+                let live_after_len = live_after.chars().count();
+                if pos < offset + live_after_len {
+                    return Some((2, usize::MAX, live_cursor + (pos - offset)));
+                }
+                offset += live_after_len;
+            }
+
             let (len, kind) = match seg {
                 Segment::Chinese(t) => (t.chars().count(), 0u8),
                 Segment::English(t) => (t.chars().count(), 1u8),
@@ -310,20 +394,23 @@ impl ComposingSession {
             offset += len;
         }
 
-        // Remaining Chinese
-        let remaining = self.remaining_chinese(chinese_buffer);
-        let rem_len = remaining.chars().count();
-        if pos < offset + rem_len {
+        let live_before_len = live_before.chars().count();
+        if pos < offset + live_before_len {
             return Some((2, usize::MAX, pos - offset));
         }
-        offset += rem_len;
+        offset += live_before_len;
 
-        // Bopomofo
         let bopo_len = bopomofo.chars().count();
         if pos < offset + bopo_len {
             return Some((3, usize::MAX, pos - offset));
         }
         offset += bopo_len;
+
+        let live_after_len = live_after.chars().count();
+        if pos < offset + live_after_len {
+            return Some((2, usize::MAX, live_cursor + (pos - offset)));
+        }
+        offset += live_after_len;
 
         // English buffer
         let eng_len = self.english_buffer.chars().count();
@@ -342,8 +429,9 @@ impl ComposingSession {
         cursor: usize,
         chinese_buffer: &str,
         bopomofo: &str,
+        chewing_cursor: usize,
     ) -> bool {
-        match self.map_display_position(cursor, chinese_buffer, bopomofo) {
+        match self.map_display_position(cursor, chinese_buffer, bopomofo, chewing_cursor) {
             Some((1, seg_idx, char_offset)) => {
                 // English segment
                 if let Segment::English(ref mut text) = self.segments[seg_idx] {
@@ -357,6 +445,7 @@ impl ComposingSession {
                 true
             }
             Some((0, seg_idx, char_offset)) => {
+                let old_live_index = self.live_insert_index();
                 let Segment::Chinese(text) = &self.segments[seg_idx] else {
                     return false;
                 };
@@ -369,27 +458,43 @@ impl ComposingSession {
                 if !suffix.is_empty() {
                     replacement.push(Segment::Chinese(suffix));
                 }
+                let replacement_len = replacement.len();
                 self.segments.splice(seg_idx..=seg_idx, replacement);
+                self.live_chinese_insert_index = if seg_idx < old_live_index {
+                    old_live_index + replacement_len - 1
+                } else {
+                    old_live_index
+                };
                 true
             }
             Some((2, _, char_offset)) => {
-                let prefix: String = self
-                    .remaining_chinese(chinese_buffer)
-                    .chars()
-                    .take(char_offset)
-                    .collect();
+                let live = self.remaining_chinese(chinese_buffer);
+                let (prefix, suffix) = Self::split_at_char(&live, char_offset);
+                let insert_idx = self.live_insert_index();
+                let mut replacement = Vec::with_capacity(3);
                 if !prefix.is_empty() {
-                    self.segments.push(Segment::Chinese(prefix));
+                    replacement.push(Segment::Chinese(prefix));
                 }
-                self.segments.push(Segment::English(ch.to_string()));
+                replacement.push(Segment::English(ch.to_string()));
+                if !suffix.is_empty() {
+                    replacement.push(Segment::Chinese(suffix));
+                }
+                let replacement_len = replacement.len();
+                self.segments.splice(insert_idx..insert_idx, replacement);
+                self.live_chinese_insert_index = insert_idx + replacement_len;
                 true
             }
             Some((3, _, _)) => {
                 let remaining = self.remaining_chinese(chinese_buffer);
+                let insert_idx = self.live_insert_index();
+                let mut replacement = Vec::with_capacity(2);
                 if !remaining.is_empty() {
-                    self.segments.push(Segment::Chinese(remaining.to_string()));
+                    replacement.push(Segment::Chinese(remaining.to_string()));
                 }
-                self.segments.push(Segment::English(ch.to_string()));
+                replacement.push(Segment::English(ch.to_string()));
+                let replacement_len = replacement.len();
+                self.segments.splice(insert_idx..insert_idx, replacement);
+                self.live_chinese_insert_index = insert_idx + replacement_len;
                 true
             }
             Some((4, _, char_offset)) => {
@@ -406,10 +511,15 @@ impl ComposingSession {
             None => {
                 let remaining = self.remaining_chinese(chinese_buffer);
                 if !remaining.is_empty() || !bopomofo.is_empty() {
+                    let insert_idx = self.live_insert_index();
+                    let mut replacement = Vec::with_capacity(2);
                     if !remaining.is_empty() {
-                        self.segments.push(Segment::Chinese(remaining.to_string()));
+                        replacement.push(Segment::Chinese(remaining.to_string()));
                     }
-                    self.segments.push(Segment::English(ch.to_string()));
+                    replacement.push(Segment::English(ch.to_string()));
+                    let replacement_len = replacement.len();
+                    self.segments.splice(insert_idx..insert_idx, replacement);
+                    self.live_chinese_insert_index = insert_idx + replacement_len;
                 } else if !self.segments.is_empty() {
                     // Preserve insertion order after existing mixed segments.
                     if let Some(Segment::English(text)) = self.segments.last_mut() {
@@ -433,12 +543,12 @@ impl ComposingSession {
 
     /// Delete the character before the given display cursor position.
     /// Returns: 0 = nothing to delete, 1 = English char deleted, 2 = Chinese region (delegate to chewing).
-    pub fn delete_at(&mut self, cursor: usize, chinese_buffer: &str, bopomofo: &str) -> i32 {
+    pub fn delete_at(&mut self, cursor: usize, chinese_buffer: &str, bopomofo: &str, chewing_cursor: usize) -> i32 {
         if cursor == 0 {
             return 0;
         }
         // Look at character BEFORE cursor
-        match self.map_display_position(cursor - 1, chinese_buffer, bopomofo) {
+        match self.map_display_position(cursor - 1, chinese_buffer, bopomofo, chewing_cursor) {
             Some((1, seg_idx, char_offset)) => {
                 // English segment
                 if let Segment::English(ref mut text) = self.segments[seg_idx] {
@@ -488,8 +598,8 @@ impl ComposingSession {
 
     /// Delete the character at the given display cursor position.
     /// Returns: 0 = nothing to delete, 1 = English char deleted, 2 = Chinese region (delegate to chewing).
-    pub fn delete_forward_at(&mut self, cursor: usize, chinese_buffer: &str, bopomofo: &str) -> i32 {
-        match self.map_display_position(cursor, chinese_buffer, bopomofo) {
+    pub fn delete_forward_at(&mut self, cursor: usize, chinese_buffer: &str, bopomofo: &str, chewing_cursor: usize) -> i32 {
+        match self.map_display_position(cursor, chinese_buffer, bopomofo, chewing_cursor) {
             Some((1, seg_idx, char_offset)) => {
                 if let Segment::English(ref mut text) = self.segments[seg_idx] {
                     if let Some((bp, _)) = text.char_indices().nth(char_offset) {
@@ -533,17 +643,26 @@ impl ComposingSession {
     /// slice of the chewing buffer; this method re-reads those slices from the
     /// updated buffer so snapshots stay in sync.
     pub fn resync_chinese(&mut self, new_chinese_buffer: &str) {
-        let mut chars_consumed = 0;
-        for seg in &mut self.segments {
+        let buffer_chars: Vec<char> = new_chinese_buffer.chars().collect();
+        let insert_idx = self.live_insert_index();
+
+        let mut start = 0usize;
+        for seg in &mut self.segments[..insert_idx] {
             if let Segment::Chinese(text) = seg {
-                let old_char_count = text.chars().count();
-                let new_text: String = new_chinese_buffer
-                    .chars()
-                    .skip(chars_consumed)
-                    .take(old_char_count)
-                    .collect();
-                *text = new_text;
-                chars_consumed += old_char_count;
+                let old_len = text.chars().count();
+                let end = (start + old_len).min(buffer_chars.len());
+                *text = buffer_chars[start..end].iter().collect();
+                start = end;
+            }
+        }
+
+        let mut end = buffer_chars.len();
+        for seg in self.segments[insert_idx..].iter_mut().rev() {
+            if let Segment::Chinese(text) = seg {
+                let old_len = text.chars().count();
+                let new_start = end.saturating_sub(old_len).max(start);
+                *text = buffer_chars[new_start..end].iter().collect();
+                end = new_start;
             }
         }
     }
@@ -554,32 +673,28 @@ impl ComposingSession {
     ///
     /// `current_chinese` is the current chewing buffer content.
     /// `current_bopomofo` is the current bopomofo reading.
-    pub fn build_display(&self, current_chinese: &str, current_bopomofo: &str) -> String {
+    pub fn build_display(&self, current_chinese: &str, current_bopomofo: &str, chewing_cursor: usize) -> String {
         let mut display = String::new();
+        let insert_idx = self.live_insert_index();
+        let (live_before, live_after, _) = self.split_live_chinese(current_chinese, chewing_cursor);
 
-        // Replay recorded segments
-        let mut already_snapshotted = String::new();
-        for segment in &self.segments {
+        for (index, segment) in self.segments.iter().enumerate() {
+            if index == insert_idx {
+                display.push_str(&live_before);
+                display.push_str(current_bopomofo);
+                display.push_str(&live_after);
+            }
             match segment {
-                Segment::Chinese(text) => {
-                    display.push_str(text);
-                    already_snapshotted.push_str(text);
-                }
-                Segment::English(text) => {
-                    display.push_str(text);
-                }
+                Segment::Chinese(text) | Segment::English(text) => display.push_str(text),
             }
         }
 
-        // Append new Chinese (buffer minus already-snapshotted)
-        if current_chinese.starts_with(&already_snapshotted) {
-            let remaining = &current_chinese[already_snapshotted.len()..];
-            display.push_str(remaining);
-        } else if !current_chinese.is_empty() {
-            display.push_str(current_chinese);
+        if insert_idx >= self.segments.len() {
+            display.push_str(&live_before);
+            display.push_str(current_bopomofo);
+            display.push_str(&live_after);
         }
 
-        display.push_str(current_bopomofo);
         display.push_str(&self.english_buffer);
         display
     }
@@ -589,27 +704,20 @@ impl ComposingSession {
     /// `final_chinese` is the committed text from chewing_handle_Enter().
     pub fn commit_all(&mut self, final_chinese: &str) -> String {
         let mut result = String::new();
+        let insert_idx = self.live_insert_index();
+        let remaining = self.remaining_chinese(final_chinese);
 
-        // Replay segments
-        let mut already_captured = String::new();
-        for segment in &self.segments {
+        for (index, segment) in self.segments.iter().enumerate() {
+            if index == insert_idx {
+                result.push_str(&remaining);
+            }
             match segment {
-                Segment::Chinese(text) => {
-                    result.push_str(text);
-                    already_captured.push_str(text);
-                }
-                Segment::English(text) => {
-                    result.push_str(text);
-                }
+                Segment::Chinese(text) | Segment::English(text) => result.push_str(text),
             }
         }
 
-        // Remaining Chinese
-        if final_chinese.starts_with(&already_captured) {
-            let remaining = &final_chinese[already_captured.len()..];
-            result.push_str(remaining);
-        } else if !final_chinese.is_empty() {
-            result.push_str(final_chinese);
+        if insert_idx >= self.segments.len() {
+            result.push_str(&remaining);
         }
 
         // Remaining English
@@ -629,8 +737,71 @@ impl ComposingSession {
         self.english_buffer.clear();
         self.segments.clear();
         self.chinese_snapshot.clear();
+        self.live_chinese_insert_index = usize::MAX;
         self.shift_held = false;
         self.shift_typed_while_held = false;
+    }
+
+    pub fn prepare_chinese_input_at(
+        &mut self,
+        cursor: usize,
+        chinese_buffer: &str,
+        bopomofo: &str,
+        chewing_cursor: usize,
+    ) {
+        match self.map_display_position(cursor, chinese_buffer, bopomofo, chewing_cursor) {
+            Some((0, seg_idx, char_offset)) => {
+                let Segment::Chinese(text) = &self.segments[seg_idx] else {
+                    return;
+                };
+                let (prefix, suffix) = Self::split_at_char(text, char_offset);
+                let mut replacement = Vec::with_capacity(2);
+                let mut insertion_index = seg_idx;
+                if !prefix.is_empty() {
+                    replacement.push(Segment::Chinese(prefix));
+                    insertion_index += 1;
+                }
+                if !suffix.is_empty() {
+                    replacement.push(Segment::Chinese(suffix));
+                }
+                self.segments.splice(seg_idx..=seg_idx, replacement);
+                self.live_chinese_insert_index = insertion_index;
+            }
+            Some((1, seg_idx, char_offset)) => {
+                let Segment::English(text) = &self.segments[seg_idx] else {
+                    return;
+                };
+                let (prefix, suffix) = Self::split_at_char(text, char_offset);
+                let mut replacement = Vec::with_capacity(2);
+                let mut insertion_index = seg_idx;
+                if !prefix.is_empty() {
+                    replacement.push(Segment::English(prefix));
+                    insertion_index += 1;
+                }
+                if !suffix.is_empty() {
+                    replacement.push(Segment::English(suffix));
+                }
+                self.segments.splice(seg_idx..=seg_idx, replacement);
+                self.live_chinese_insert_index = insertion_index;
+            }
+            Some((4, _, char_offset)) => {
+                let (prefix, suffix) = Self::split_at_char(&self.english_buffer, char_offset);
+                if !prefix.is_empty() {
+                    self.segments.push(Segment::English(prefix));
+                }
+                self.english_buffer = suffix;
+                self.live_chinese_insert_index = self.segments.len();
+            }
+            Some((2, _, _)) | Some((3, _, _)) => {
+                if self.live_chinese_insert_index == usize::MAX {
+                    self.live_chinese_insert_index = self.segments.len();
+                }
+            }
+            None => {
+                self.live_chinese_insert_index = self.segments.len();
+            }
+            _ => {}
+        }
     }
 
     // MARK: - Internal
@@ -642,6 +813,7 @@ impl ComposingSession {
                 self.segments.push(Segment::English(self.english_buffer.clone()));
                 self.english_buffer.clear();
             }
+            self.live_chinese_insert_index = self.segments.len();
         } else {
             // Switching FROM Chinese → English: snapshot only NEW Chinese content
             if !chinese_buffer.is_empty() {
@@ -666,6 +838,7 @@ impl ComposingSession {
                 }
                 self.chinese_snapshot = chinese_buffer.to_string();
             }
+            self.live_chinese_insert_index = self.segments.len();
         }
     }
 
@@ -693,9 +866,9 @@ mod tests {
     fn insert_english_at_splits_remaining_chinese() {
         let mut session = ComposingSession::new();
 
-        assert!(session.insert_english_at('3', 2, "你好世界", ""));
-        assert_eq!(session.build_display("你好世界", ""), "你好3世界");
-        assert_eq!(session.display_to_chewing_cursor(3, "你好世界", ""), 2);
+        assert!(session.insert_english_at('3', 2, "你好世界", "", 4));
+        assert_eq!(session.build_display("你好世界", "", 4), "你好3世界");
+        assert_eq!(session.display_to_chewing_cursor(3, "你好世界", "", 4), 2);
         assert_eq!(session.commit_all("你好世界"), "你好3世界");
     }
 
@@ -703,11 +876,11 @@ mod tests {
     fn insert_english_at_splits_snapshotted_chinese_segment() {
         let mut session = ComposingSession::new();
 
-        assert!(session.insert_english_at('3', 2, "你好世界", ""));
-        assert!(session.insert_english_at('4', 1, "你好世界", ""));
+        assert!(session.insert_english_at('3', 2, "你好世界", "", 4));
+        assert!(session.insert_english_at('4', 1, "你好世界", "", 4));
 
-        assert_eq!(session.build_display("你好世界", ""), "你4好3世界");
-        assert_eq!(session.display_to_chewing_cursor(2, "你好世界", ""), 1);
+        assert_eq!(session.build_display("你好世界", "", 4), "你4好3世界");
+        assert_eq!(session.display_to_chewing_cursor(2, "你好世界", "", 4), 1);
         assert_eq!(session.commit_all("你好世界"), "你4好3世界");
     }
 
@@ -715,11 +888,11 @@ mod tests {
     fn insert_english_at_end_of_chinese_keeps_future_chinese_after_it() {
         let mut session = ComposingSession::new();
 
-        assert!(session.insert_english_at('3', 2, "甲乙", ""));
+        assert!(session.insert_english_at('3', 2, "甲乙", "", 2));
 
-        assert_eq!(session.build_display("甲乙", ""), "甲乙3");
-        assert_eq!(session.display_to_chewing_cursor(3, "甲乙", ""), 2);
-        assert_eq!(session.build_display("甲乙丙丁", ""), "甲乙3丙丁");
+        assert_eq!(session.build_display("甲乙", "", 2), "甲乙3");
+        assert_eq!(session.display_to_chewing_cursor(3, "甲乙", "", 2), 2);
+        assert_eq!(session.build_display("甲乙丙丁", "", 2), "甲乙3丙丁");
         assert_eq!(session.commit_all("甲乙丙丁"), "甲乙3丙丁");
     }
 
@@ -727,11 +900,11 @@ mod tests {
     fn insert_english_after_space_keeps_future_chinese_after_digit() {
         let mut session = ComposingSession::new();
 
-        assert!(session.insert_english_at(' ', 2, "甲乙", ""));
-        assert!(session.insert_english_at('3', 3, "甲乙", ""));
+        assert!(session.insert_english_at(' ', 2, "甲乙", "", 2));
+        assert!(session.insert_english_at('3', 3, "甲乙", "", 2));
 
-        assert_eq!(session.build_display("甲乙", ""), "甲乙 3");
-        assert_eq!(session.build_display("甲乙丙丁", ""), "甲乙 3丙丁");
+        assert_eq!(session.build_display("甲乙", "", 2), "甲乙 3");
+        assert_eq!(session.build_display("甲乙丙丁", "", 2), "甲乙 3丙丁");
         assert_eq!(session.commit_all("甲乙丙丁"), "甲乙 3丙丁");
     }
 
@@ -739,20 +912,20 @@ mod tests {
     fn insert_english_at_before_bopomofo_keeps_cursor_after_inserted_text() {
         let mut session = ComposingSession::new();
 
-        assert!(session.insert_english_at('3', 2, "你好", "ㄅ"));
+        assert!(session.insert_english_at('3', 2, "你好", "ㄅ", 2));
 
-        assert_eq!(session.build_display("你好", "ㄅ"), "你好3ㄅ");
-        assert_eq!(session.display_to_chewing_cursor(3, "你好", "ㄅ"), 2);
+        assert_eq!(session.build_display("你好", "ㄅ", 2), "你好3ㄅ");
+        assert_eq!(session.display_to_chewing_cursor(3, "你好", "ㄅ", 2), 2);
     }
 
     #[test]
     fn insert_english_at_empty_state_keeps_later_input_after_prefix_symbol() {
         let mut session = ComposingSession::new();
 
-        assert!(session.insert_english_at('，', 0, "", ""));
+        assert!(session.insert_english_at('，', 0, "", "", 0));
 
-        assert_eq!(session.build_display("", "ㄅ"), "，ㄅ");
-        assert_eq!(session.build_display("你好", ""), "，你好");
+        assert_eq!(session.build_display("", "ㄅ", 0), "，ㄅ");
+        assert_eq!(session.build_display("你好", "", 0), "，你好");
         assert_eq!(session.commit_all("你好"), "，你好");
     }
 
@@ -760,10 +933,10 @@ mod tests {
     fn delete_forward_at_cursor_removes_selected_prefix_symbol() {
         let mut session = ComposingSession::new();
 
-        assert!(session.insert_english_at('，', 0, "", ""));
+        assert!(session.insert_english_at('，', 0, "", "", 0));
 
-        assert_eq!(session.delete_forward_at(0, "你好", ""), 1);
-        assert_eq!(session.build_display("你好", ""), "你好");
+        assert_eq!(session.delete_forward_at(0, "你好", "", 0), 1);
+        assert_eq!(session.build_display("你好", "", 0), "你好");
         assert_eq!(session.commit_all("你好"), "你好");
     }
 
@@ -771,11 +944,34 @@ mod tests {
     fn delete_forward_at_cursor_removes_selected_english_in_middle() {
         let mut session = ComposingSession::new();
 
-        assert!(session.insert_english_at('A', 1, "你好", ""));
+        assert!(session.insert_english_at('A', 1, "你好", "", 2));
 
-        assert_eq!(session.build_display("你好", ""), "你A好");
-        assert_eq!(session.delete_forward_at(1, "你好", ""), 1);
-        assert_eq!(session.build_display("你好", ""), "你好");
+        assert_eq!(session.build_display("你好", "", 2), "你A好");
+        assert_eq!(session.delete_forward_at(1, "你好", "", 2), 1);
+        assert_eq!(session.build_display("你好", "", 2), "你好");
         assert_eq!(session.commit_all("你好"), "你好");
+    }
+
+    #[test]
+    fn prepare_chinese_input_keeps_new_chinese_before_existing_english_suffix() {
+        let mut session = ComposingSession::new();
+
+        assert!(session.insert_english_at('3', 2, "甲乙", "", 2));
+        session.prepare_chinese_input_at(2, "甲乙", "", 2);
+
+        assert_eq!(session.build_display("甲乙丙", "", 3), "甲乙丙3");
+        assert_eq!(session.display_to_chewing_cursor(3, "甲乙丙", "", 3), 3);
+        assert_eq!(session.commit_all("甲乙丙"), "甲乙丙3");
+    }
+
+    #[test]
+    fn build_display_inserts_bopomofo_at_live_chinese_cursor_in_mixed_content() {
+        let mut session = ComposingSession::new();
+
+        assert!(session.insert_english_at('A', 1, "你好", "", 2));
+        session.prepare_chinese_input_at(1, "你好", "", 1);
+
+        assert_eq!(session.build_display("你中好", "ㄅ", 2), "你中ㄅA好");
+        assert_eq!(session.display_to_chewing_cursor(3, "你中好", "ㄅ", 2), 2);
     }
 }

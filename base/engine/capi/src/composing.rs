@@ -131,6 +131,7 @@ pub extern "C" fn qb_composing_build_display(
     session: *const QBComposingSession,
     chinese_buffer: *const c_char,
     bopomofo: *const c_char,
+    chewing_cursor: i32,
 ) -> *mut c_char {
     if session.is_null() { return std::ptr::null_mut(); }
     let s = unsafe { &*session };
@@ -144,7 +145,7 @@ pub extern "C" fn qb_composing_build_display(
     } else {
         unsafe { CStr::from_ptr(bopomofo) }.to_str().unwrap_or("")
     };
-    let display = s.inner.build_display(chinese, bopo);
+    let display = s.inner.build_display(chinese, bopo, chewing_cursor.max(0) as usize);
     match CString::new(display) {
         Ok(c) => c.into_raw(),
         Err(_) => std::ptr::null_mut(),
@@ -190,6 +191,7 @@ pub extern "C" fn qb_composing_insert_string_at_cursor(
     cursor: i32,
     chinese_buffer: *const c_char,
     bopomofo: *const c_char,
+    chewing_cursor: i32,
 ) -> i32 {
     if session.is_null() || text.is_null() || cursor < 0 {
         return 0;
@@ -214,7 +216,7 @@ pub extern "C" fn qb_composing_insert_string_at_cursor(
     let mut current_cursor = cursor as usize;
     let mut handled = false;
     for ch in text_str.chars() {
-        if s.inner.insert_english_at(ch, current_cursor, chinese, bopo) {
+        if s.inner.insert_english_at(ch, current_cursor, chinese, bopo, chewing_cursor.max(0) as usize) {
             current_cursor += 1;
             handled = true;
         }
@@ -231,6 +233,7 @@ pub extern "C" fn qb_composing_insert_at_cursor(
     cursor: i32,
     chinese_buffer: *const c_char,
     bopomofo: *const c_char,
+    chewing_cursor: i32,
 ) -> i32 {
     if session.is_null() || cursor < 0 {
         return 0;
@@ -250,7 +253,7 @@ pub extern "C" fn qb_composing_insert_at_cursor(
             .to_str()
             .unwrap_or("")
     };
-    if s.inner.insert_english_at(ch as char, cursor as usize, chinese, bopo) {
+    if s.inner.insert_english_at(ch as char, cursor as usize, chinese, bopo, chewing_cursor.max(0) as usize) {
         1
     } else {
         0
@@ -265,6 +268,7 @@ pub extern "C" fn qb_composing_delete_at_cursor(
     cursor: i32,
     chinese_buffer: *const c_char,
     bopomofo: *const c_char,
+    chewing_cursor: i32,
 ) -> i32 {
     if session.is_null() || cursor < 0 {
         return 0;
@@ -284,7 +288,7 @@ pub extern "C" fn qb_composing_delete_at_cursor(
             .to_str()
             .unwrap_or("")
     };
-    s.inner.delete_at(cursor as usize, chinese, bopo)
+    s.inner.delete_at(cursor as usize, chinese, bopo, chewing_cursor.max(0) as usize)
 }
 
 /// Delete the character at the given display cursor position.
@@ -295,6 +299,7 @@ pub extern "C" fn qb_composing_delete_forward_at_cursor(
     cursor: i32,
     chinese_buffer: *const c_char,
     bopomofo: *const c_char,
+    chewing_cursor: i32,
 ) -> i32 {
     if session.is_null() || cursor < 0 {
         return 0;
@@ -314,7 +319,7 @@ pub extern "C" fn qb_composing_delete_forward_at_cursor(
             .to_str()
             .unwrap_or("")
     };
-    s.inner.delete_forward_at(cursor as usize, chinese, bopo)
+    s.inner.delete_forward_at(cursor as usize, chinese, bopo, chewing_cursor.max(0) as usize)
 }
 
 /// Query the region type at a given display cursor position.
@@ -326,6 +331,7 @@ pub extern "C" fn qb_composing_cursor_region(
     cursor: i32,
     chinese_buffer: *const c_char,
     bopomofo: *const c_char,
+    chewing_cursor: i32,
 ) -> i32 {
     if session.is_null() || cursor < 0 {
         return -1;
@@ -345,7 +351,7 @@ pub extern "C" fn qb_composing_cursor_region(
             .to_str()
             .unwrap_or("")
     };
-    s.inner.cursor_region(cursor as usize, chinese, bopo)
+    s.inner.cursor_region(cursor as usize, chinese, bopo, chewing_cursor.max(0) as usize)
 }
 
 /// Convert a display cursor position to the corresponding chewing engine cursor position.
@@ -356,6 +362,7 @@ pub extern "C" fn qb_composing_display_to_chewing_cursor(
     cursor: i32,
     chinese_buffer: *const c_char,
     bopomofo: *const c_char,
+    chewing_cursor: i32,
 ) -> i32 {
     if session.is_null() || cursor < 0 {
         return -1;
@@ -375,7 +382,37 @@ pub extern "C" fn qb_composing_display_to_chewing_cursor(
             .to_str()
             .unwrap_or("")
     };
-    s.inner.display_to_chewing_cursor(cursor as usize, chinese, bopo)
+    s.inner.display_to_chewing_cursor(cursor as usize, chinese, bopo, chewing_cursor.max(0) as usize)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn qb_composing_prepare_chinese_input_at_cursor(
+    session: *mut QBComposingSession,
+    cursor: i32,
+    chinese_buffer: *const c_char,
+    bopomofo: *const c_char,
+    chewing_cursor: i32,
+) {
+    if session.is_null() || cursor < 0 {
+        return;
+    }
+    let s = unsafe { &mut *session };
+    let chinese = if chinese_buffer.is_null() {
+        ""
+    } else {
+        unsafe { CStr::from_ptr(chinese_buffer) }.to_str().unwrap_or("")
+    };
+    let bopo = if bopomofo.is_null() {
+        ""
+    } else {
+        unsafe { CStr::from_ptr(bopomofo) }.to_str().unwrap_or("")
+    };
+    s.inner.prepare_chinese_input_at(
+        cursor as usize,
+        chinese,
+        bopo,
+        chewing_cursor.max(0) as usize,
+    );
 }
 
 /// Re-synchronize Chinese segments after chewing buffer changed (e.g. candidate selection).
