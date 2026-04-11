@@ -348,6 +348,33 @@ impl ComposingSession {
         chinese_chars_before as i32
     }
 
+    /// Convert the current chewing cursor to the display cursor in mixed content.
+    ///
+    /// The returned position is after the active bopomofo reading, matching the
+    /// cursor placement used by pure Chinese composition.
+    pub fn display_cursor_for_chewing_cursor(
+        &self,
+        chinese_buffer: &str,
+        bopomofo: &str,
+        chewing_cursor: usize,
+    ) -> usize {
+        let insert_idx = self.live_insert_index();
+        let (live_before, _, _) = self.split_live_chinese(chinese_buffer, chewing_cursor);
+        let mut offset = 0usize;
+
+        for (index, seg) in self.segments.iter().enumerate() {
+            if index == insert_idx {
+                return offset + live_before.chars().count() + bopomofo.chars().count();
+            }
+
+            offset += match seg {
+                Segment::Chinese(t) | Segment::English(t) => t.chars().count(),
+            };
+        }
+
+        offset + live_before.chars().count() + bopomofo.chars().count()
+    }
+
     /// Map a display character position to a region in the underlying data structure.
     /// Returns (region_type, segment_index_or_MAX, char_offset_within_region).
     ///
@@ -973,5 +1000,19 @@ mod tests {
 
         assert_eq!(session.build_display("你中好", "ㄅ", 2), "你中ㄅA好");
         assert_eq!(session.display_to_chewing_cursor(3, "你中好", "ㄅ", 2), 2);
+    }
+
+    #[test]
+    fn display_cursor_for_chewing_cursor_stays_at_mixed_edit_position() {
+        let mut session = ComposingSession::new();
+
+        assert!(session.insert_english_at('A', 1, "你好", "", 2));
+        session.prepare_chinese_input_at(1, "你好", "", 1);
+
+        assert_eq!(session.build_display("你中好", "ㄅ", 2), "你中ㄅA好");
+        assert_eq!(
+            session.display_cursor_for_chewing_cursor("你中好", "ㄅ", 2),
+            3
+        );
     }
 }

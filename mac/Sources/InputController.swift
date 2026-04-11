@@ -516,6 +516,7 @@ class QBopomofoInputController: IMKInputController {
         }
 
         // Mixed content: sync chewing engine cursor before delegating to engine
+        let mixedCursorWasExplicit = qb_composing_has_mixed_content(session) != 0 && mixedDisplayCursor != nil
         if qb_composing_has_mixed_content(session) != 0, let curPos = mixedDisplayCursor {
             let chinBuf = getChewingBuffer(ctx)
             let bopo = getBopomofoReading(ctx)
@@ -633,13 +634,25 @@ class QBopomofoInputController: IMKInputController {
             }
 
             restoreMixedCursorIfNeeded()
+            if mixedCursorWasExplicit {
+                updateMixedCursorFromChewing(ctx: ctx, session: session)
+                savedMixedCursor = inCandidateMode(ctx) ? mixedDisplayCursor : nil
+            }
             updateClientDisplay(ctx: ctx, session: session, client: client)
             return true
         }
 
         // Chinese mode — send to chewing engine
         let handled = processChewingKey(ctx: ctx, keyCode: keyCode, chars: chars)
-        if handled { updateClientDisplay(ctx: ctx, session: session, client: client) }
+        if handled {
+            if mixedCursorWasExplicit {
+                updateMixedCursorFromChewing(ctx: ctx, session: session)
+                savedMixedCursor = inCandidateMode(ctx) ? mixedDisplayCursor : nil
+            }
+            updateClientDisplay(ctx: ctx, session: session, client: client)
+        } else if mixedCursorWasExplicit {
+            restoreMixedCursorIfNeeded()
+        }
         return handled
     }
 
@@ -981,6 +994,20 @@ class QBopomofoInputController: IMKInputController {
             return Int(chewing_cursor_Current(ctx))
         }
         return nil
+    }
+
+    private func updateMixedCursorFromChewing(ctx: OpaquePointer, session: OpaquePointer) {
+        let chinese = getChewingBuffer(ctx)
+        let bopo = getBopomofoReading(ctx)
+        let displayCursor = chinese.withCString { c in
+            bopo.withCString { b in
+                qb_composing_display_cursor_for_chewing_cursor(session, c, b, Int32(chewing_cursor_Current(ctx)))
+            }
+        }
+        if displayCursor >= 0 {
+            mixedDisplayCursor = Int(displayCursor)
+            dbg("mixed cursor from chewing → display=\(displayCursor)")
+        }
     }
 
     private func insertASCIIIntoComposition(

@@ -385,6 +385,36 @@ pub extern "C" fn qb_composing_display_to_chewing_cursor(
     s.inner.display_to_chewing_cursor(cursor as usize, chinese, bopo, chewing_cursor.max(0) as usize)
 }
 
+/// Convert the current chewing cursor to the display cursor for mixed content.
+#[unsafe(no_mangle)]
+pub extern "C" fn qb_composing_display_cursor_for_chewing_cursor(
+    session: *const QBComposingSession,
+    chinese_buffer: *const c_char,
+    bopomofo: *const c_char,
+    chewing_cursor: i32,
+) -> i32 {
+    if session.is_null() {
+        return -1;
+    }
+    let s = unsafe { &*session };
+    let chinese = if chinese_buffer.is_null() {
+        ""
+    } else {
+        unsafe { CStr::from_ptr(chinese_buffer) }
+            .to_str()
+            .unwrap_or("")
+    };
+    let bopo = if bopomofo.is_null() {
+        ""
+    } else {
+        unsafe { CStr::from_ptr(bopomofo) }
+            .to_str()
+            .unwrap_or("")
+    };
+    s.inner
+        .display_cursor_for_chewing_cursor(chinese, bopo, chewing_cursor.max(0) as usize) as i32
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn qb_composing_prepare_chinese_input_at_cursor(
     session: *mut QBComposingSession,
