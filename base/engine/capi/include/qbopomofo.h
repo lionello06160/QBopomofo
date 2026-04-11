@@ -152,6 +152,14 @@ int qb_composing_display_to_chewing_cursor(const QBComposingSession *session, in
                                             const char *chinese_buffer, const char *bopomofo, int chewing_cursor);
 
 /**
+ * Convert the current chewing cursor to a mixed-content display cursor.
+ * The returned display cursor is after the active bopomofo reading.
+ */
+int qb_composing_display_cursor_for_chewing_cursor(const QBComposingSession *session,
+                                                    const char *chinese_buffer, const char *bopomofo,
+                                                    int chewing_cursor);
+
+/**
  * Reposition the live chewing buffer to the given display cursor before Chinese input.
  * This preserves later English segments so new Chinese stays at the cursor position.
  */
