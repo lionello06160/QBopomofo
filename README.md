@@ -1,32 +1,32 @@
 # QBopomofo — Q注音輸入法
 
-跨平台智慧注音輸入法，支援 macOS 與 Windows。
+跨平台注音輸入法專案，目前包含 macOS 實作與 Windows TSF 實作。macOS 安裝流程較完整；Windows 版仍建議視為開發/測試狀態。
 
 本專案 fork 自 [tonyq-org/QBopomofo](https://github.com/tonyq-org/QBopomofo)，其引擎核心與字詞庫資料源自 [Chewing（酷音）](https://chewing.im/) 開源專案，由 [libchewing Core Team](https://codeberg.org/chewing/libchewing) 及社群貢獻者多年維護。本 fork 在此基礎上進行獨立發展。
 
 本 fork 不是 tonyq-org/QBopomofo、libchewing 或 libchewing-data 的官方版本。
 
-## 上游專案與分歧版本
+## 來源與授權
 
-本專案源自以下上游專案，並於下列版本分歧後獨立發展：
+本專案源自以下開源專案：
 
-| 專案 | 說明 | 授權 | 分歧點 |
+| 專案 | 說明 | 授權 | 備註 |
 |------|------|------|--------|
 | [tonyq-org/QBopomofo](https://github.com/tonyq-org/QBopomofo) | Q注音輸入法原始專案 | LGPL-2.1-or-later | fork 後由本 repo 獨立維護 |
 | [libchewing](https://codeberg.org/chewing/libchewing) | 智慧注音輸入法引擎 | LGPL-2.1 | [`100a0e0`](https://codeberg.org/chewing/libchewing/commit/100a0e09178532c570cc1680c97bc7541617426a)（2026-03-28） |
 | [libchewing-data](https://codeberg.org/chewing/libchewing-data) | 字詞庫與詞頻資料 | LGPL-2.1 | [`dd81960`](https://codeberg.org/chewing/libchewing-data/commit/dd81960c90a75d07c3a80b542d721694cc034665)（2026-03-26） |
 
-> 分歧後不再追蹤上游更新，引擎與資料均獨立維護。
+> fork 後的額外修改由本 repo 維護；引擎與資料若需要同步上游，需手動更新。
 
 ## 專案結構
 
 ```
 QBopomofo/
 ├── base/engine/         # 引擎核心（源自 libchewing，獨立發展）
-├── base/config/         # 共用設定
+├── base/config/         # 模式設定檔草案
 ├── data-provider/       # 資料隔離層（build-time 處理 pipeline）
 ├── mac/                 # macOS 實作（Swift + InputMethodKit）
-├── win/                 # Windows 實作（Rust + TSF）
+├── win/                 # Windows TSF 實作（開發/測試中）
 └── plans/               # 架構文件
 ```
 
@@ -107,28 +107,39 @@ cd mac
 ./install.sh
 ```
 
-### 建立 `.pkg` 安裝程式
+### 建立 `.app` bundle
 
-如果你要發給其他 Mac 直接點兩下安裝，可以在開發機上產生 `.pkg`：
+如果只要產生 macOS input method app bundle，可以執行：
 
 ```bash
 cd QBopomofo/mac
-./build-pkg.sh
+./build-app.sh
 ```
 
 產生出的檔案會在：
 
 ```bash
-mac/.build/QBopomofo-Installer.pkg
+mac/.build/QBopomofo.app
 ```
 
-目前這是未 notarize 的安裝骨架版本，適合內部測試或自用機器。目標 Mac 安裝後，app 會被放到：
+這是未 notarize 的 app bundle，適合內部測試或自用機器。使用 `./install.sh` 安裝時，app 會被放到：
 
 ```bash
-/Library/Input Methods/QBopomofo.app
+~/Library/Input Methods/QBopomofo.app
 ```
 
 安裝完成後，仍需到「系統設定 → 鍵盤 → 輸入方式 → +」手動加入 `Q注音`。
+
+## Windows 版狀態
+
+`win/` 目錄包含 Windows TSF Text Service 實作與安裝腳本：
+
+```powershell
+cd QBopomofo\win
+.\install.bat
+```
+
+Windows 版目前偏開發/測試用途，建議先在 Windows 測試機或 Windows Sandbox 驗證。安裝腳本會建置並註冊 TSF DLL；正式散布前仍需確認字典資料檔、安裝流程與移除流程都符合目標環境。
 
 ### 常見問題
 
@@ -148,7 +159,7 @@ mac/.build/QBopomofo-Installer.pkg
 ## 與上游的關係
 
 - 本專案 fork 自 [tonyq-org/QBopomofo](https://github.com/tonyq-org/QBopomofo)，fork 後的額外修改由本 repo 維護
-- `base/engine/` 的初始程式碼來自 libchewing，之後獨立發展，不再追蹤上游更新
+- `base/engine/` 的初始程式碼來自 libchewing，之後由本 repo 維護
 - `data-provider/chewing-data/` 的 CSV 資料來自 libchewing-data，可視需要手動同步
 - 詳見 [NOTICE](./NOTICE) 了解完整版權聲明
 
