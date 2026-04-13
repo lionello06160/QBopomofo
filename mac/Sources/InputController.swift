@@ -276,17 +276,8 @@ class QBopomofoInputController: IMKInputController {
                     ch = ch.lowercased().first ?? ch
                 }
 
-                let chinBuf = getChewingBuffer(ctx)
-                let directCommit = chinBuf.withCString { cStr in
-                    qb_composing_type_english(session, UInt8(ch.asciiValue ?? 0), cStr)
-                }
-                if directCommit != 0 {
-                    dbg("insertText='\(ch)' [source:shiftEnglish]")
-                    client.insertText(String(ch), replacementRange: NSRange(location: NSNotFound, length: 0))
-                } else {
-                    updateClientDisplay(ctx: ctx, session: session, client: client)
-                }
-                return true
+                qb_composing_mark_shift_used(session)
+                return insertASCIIIntoComposition(ch, ctx: ctx, session: session, client: client, source: "shiftEnglish")
             }
             // Non-letter key while Shift held: mark used so release won't toggle mode
             qb_composing_mark_shift_used(session)
