@@ -2,7 +2,9 @@
 
 跨平台智慧注音輸入法，支援 macOS 與 Windows。
 
-本專案的引擎核心與字詞庫資料源自 [Chewing（酷音）](https://chewing.im/) 開源專案，由 [libchewing Core Team](https://codeberg.org/chewing/libchewing) 及社群貢獻者多年維護。我們在此基礎上進行獨立發展。
+本專案 fork 自 [tonyq-org/QBopomofo](https://github.com/tonyq-org/QBopomofo)，其引擎核心與字詞庫資料源自 [Chewing（酷音）](https://chewing.im/) 開源專案，由 [libchewing Core Team](https://codeberg.org/chewing/libchewing) 及社群貢獻者多年維護。本 fork 在此基礎上進行獨立發展。
+
+本 fork 不是 tonyq-org/QBopomofo、libchewing 或 libchewing-data 的官方版本。
 
 ## 上游專案與分歧版本
 
@@ -10,6 +12,7 @@
 
 | 專案 | 說明 | 授權 | 分歧點 |
 |------|------|------|--------|
+| [tonyq-org/QBopomofo](https://github.com/tonyq-org/QBopomofo) | Q注音輸入法原始專案 | LGPL-2.1-or-later | fork 後由本 repo 獨立維護 |
 | [libchewing](https://codeberg.org/chewing/libchewing) | 智慧注音輸入法引擎 | LGPL-2.1 | [`100a0e0`](https://codeberg.org/chewing/libchewing/commit/100a0e09178532c570cc1680c97bc7541617426a)（2026-03-28） |
 | [libchewing-data](https://codeberg.org/chewing/libchewing-data) | 字詞庫與詞頻資料 | LGPL-2.1 | [`dd81960`](https://codeberg.org/chewing/libchewing-data/commit/dd81960c90a75d07c3a80b542d721694cc034665)（2026-03-26） |
 
@@ -144,9 +147,20 @@ mac/.build/QBopomofo-Installer.pkg
 
 ## 與上游的關係
 
+- 本專案 fork 自 [tonyq-org/QBopomofo](https://github.com/tonyq-org/QBopomofo)，fork 後的額外修改由本 repo 維護
 - `base/engine/` 的初始程式碼來自 libchewing，之後獨立發展，不再追蹤上游更新
 - `data-provider/chewing-data/` 的 CSV 資料來自 libchewing-data，可視需要手動同步
 - 詳見 [NOTICE](./NOTICE) 了解完整版權聲明
+
+## 發布注意事項
+
+如果你要公開原始碼或散布 `.app` / `.pkg` 安裝檔，請一併保留並提供：
+
+- [LICENSE](./LICENSE)
+- [NOTICE](./NOTICE)
+- 本 repo 的原始碼網址或對應 release/tag
+
+本專案依 LGPL-2.1-or-later 授權釋出；如果散布二進位檔，接收者也應能取得對應版本的原始碼。
 
 ## 授權
 
