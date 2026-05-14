@@ -138,6 +138,16 @@ final class ChewingBridge: ObservableObject {
             log("DEBUG mode=\(rustEnglish ? "EN" : "CH") mixed=\(hasMixed) swiftEN=\(isEnglishMode)")
         }
 
+        // Shift+Space toggles full-width / half-width mode before any normal
+        // Space handling can insert text or interact with candidates.
+        if keyCode == 49 && shift {
+            qb_composing_mark_shift_used(session)
+            chewing_handle_ShiftSpace(ctx)
+            log("Key: Shift+Space (toggle full/half shape)")
+            updateState()
+            return true
+        }
+
         // Shift held + typing → English (letters only; punctuation falls through to engine)
         if shift && qb_composing_is_shift_held(session) != 0 {
             if let ch = characters.first, ch.isASCII, ch.isLetter {

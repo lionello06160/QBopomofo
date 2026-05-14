@@ -235,6 +235,16 @@ class QBopomofoInputController: IMKInputController {
         // Pass through Command/Control (except the ones handled above)
         if modifiers.contains(.command) || modifiers.contains(.control) { return false }
 
+        // Shift+Space toggles full-width / half-width mode. Handle this before
+        // normal Space paths so it does not insert a space or open candidates.
+        if keyCode == 49 && shift && !modifiers.contains(.option) {
+            qb_composing_mark_shift_used(session)
+            chewing_handle_ShiftSpace(ctx)
+            dbg("shift+space → toggle full/half shape")
+            updateClientDisplay(ctx: ctx, session: session, client: client)
+            return true
+        }
+
         // Nothing in buffer/bopomofo and not in candidate mode → pass through navigation keys
         let hasContent = chewing_buffer_Len(ctx) > 0 || chewing_bopomofo_Check(ctx) != 0
             || qb_composing_has_mixed_content(session) != 0
