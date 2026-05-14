@@ -245,6 +245,18 @@ class QBopomofoInputController: IMKInputController {
             return true
         }
 
+        // In full-width mode, printable ASCII should be emitted as full-width
+        // characters before the standard Bopomofo layout can consume keys like
+        // "-" as ㄦ or "," as ㄝ.
+        if !isCandMode,
+           !modifiers.contains(.option),
+           chewing_get_ShapeMode(ctx) == FULLSHAPE_MODE,
+           let ch = chars.first,
+           let fullWidth = fullWidthASCIIString(for: ch) {
+            qb_composing_mark_shift_used(session)
+            return insertStringIntoComposition(fullWidth, ctx: ctx, session: session, client: client, source: "fullWidth")
+        }
+
         // Nothing in buffer/bopomofo and not in candidate mode → pass through navigation keys
         let hasContent = chewing_buffer_Len(ctx) > 0 || chewing_bopomofo_Check(ctx) != 0
             || qb_composing_has_mixed_content(session) != 0
@@ -915,6 +927,10 @@ class QBopomofoInputController: IMKInputController {
     private func handleControlSymbols(keyCode: UInt16, client: IMKTextInput, ctx: OpaquePointer, session: OpaquePointer) -> Bool {
         let symbol: String?
         switch keyCode {
+        case 50: symbol = "‵" // `
+        case 27: symbol = "－" // -
+        case 24: symbol = "＝" // =
+        case 42: symbol = "＼" // \
         case 43: symbol = "，" // ,
         case 47: symbol = "。" // .
         case 44: symbol = "？" // /
@@ -926,25 +942,7 @@ class QBopomofoInputController: IMKInputController {
         }
 
         if let s = symbol {
-            let cursor = Int32(mixedDisplayCursor ?? lastDisplayCharCount)
-            let chinese = getChewingBuffer(ctx)
-            let bopo = getBopomofoString(ctx)
-            
-            s.withCString { symbolPtr in
-                chinese.withCString { chiPtr in
-                    bopo.withCString { bopoPtr in
-                        qb_composing_insert_string_at_cursor(session, symbolPtr, cursor, chiPtr, bopoPtr, Int32(chewing_cursor_Current(ctx)))
-                    }
-                }
-            }
-            
-            // Advance cursor if it was explicit
-            if let mcp = mixedDisplayCursor {
-                mixedDisplayCursor = mcp + 1
-            }
-            
-            updateClientDisplay(ctx: ctx, session: session, client: client)
-            return true
+            return insertStringIntoComposition(s, ctx: ctx, session: session, client: client, source: "controlSymbol")
         }
         return false
     }
@@ -1051,6 +1049,160 @@ class QBopomofoInputController: IMKInputController {
             updateClientDisplay(ctx: ctx, session: session, client: client)
         }
         return true
+    }
+
+    private func insertStringIntoComposition(
+        _ text: String,
+        ctx: OpaquePointer,
+        session: OpaquePointer,
+        client: IMKTextInput,
+        source: String
+    ) -> Bool {
+        let chinBuf = getChewingBuffer(ctx)
+        let bopo = getBopomofoReading(ctx)
+        let hasComposition = !chinBuf.isEmpty
+            || !bopo.isEmpty
+            || qb_composing_has_mixed_content(session) != 0
+            || lastMarkedUtf16Length > 0
+
+        if !hasComposition {
+            dbg("insertText='\(text)' [source:\(source)]")
+            client.insertText(text, replacementRange: NSRange(location: NSNotFound, length: 0))
+            return true
+        }
+
+        if let curPos = preferredInsertCursor(ctx: ctx, session: session) {
+            let handled = text.withCString { textPtr in
+                chinBuf.withCString { chiPtr in
+                    bopo.withCString { bopoPtr in
+                        qb_composing_insert_string_at_cursor(
+                            session,
+                            textPtr,
+                            Int32(curPos),
+                            chiPtr,
+                            bopoPtr,
+                            Int32(chewing_cursor_Current(ctx))
+                        )
+                    }
+                }
+            }
+            if handled != 0 {
+                mixedDisplayCursor = curPos + text.count
+                dbg("\(source) insert '\(text)' at cursor \(curPos) → \(mixedDisplayCursor!)")
+                updateClientDisplay(ctx: ctx, session: session, client: client)
+                return true
+            }
+            if mixedDisplayCursor != nil {
+                mixedDisplayCursor = nil
+            }
+        }
+
+        dbg("insertText='\(text)' [source:\(source)]")
+        client.insertText(text, replacementRange: NSRange(location: NSNotFound, length: lastMarkedUtf16Length))
+        lastMarkedUtf16Length = 0
+        return true
+    }
+
+    private func fullWidthASCIIString(for ch: Character) -> String? {
+        guard ch.isASCII else { return nil }
+        switch ch {
+        case " ": return "　"
+        case "!": return "！"
+        case "\"": return "”"
+        case "#": return "＃"
+        case "$": return "＄"
+        case "%": return "％"
+        case "&": return "＆"
+        case "'": return "’"
+        case "(": return "（"
+        case ")": return "）"
+        case "*": return "＊"
+        case "+": return "＋"
+        case ",": return "，"
+        case "-": return "－"
+        case ".": return "。"
+        case "/": return "／"
+        case "0": return "０"
+        case "1": return "１"
+        case "2": return "２"
+        case "3": return "３"
+        case "4": return "４"
+        case "5": return "５"
+        case "6": return "６"
+        case "7": return "７"
+        case "8": return "８"
+        case "9": return "９"
+        case ":": return "："
+        case ";": return "；"
+        case "<": return "＜"
+        case "=": return "＝"
+        case ">": return "＞"
+        case "?": return "？"
+        case "@": return "＠"
+        case "A": return "Ａ"
+        case "B": return "Ｂ"
+        case "C": return "Ｃ"
+        case "D": return "Ｄ"
+        case "E": return "Ｅ"
+        case "F": return "Ｆ"
+        case "G": return "Ｇ"
+        case "H": return "Ｈ"
+        case "I": return "Ｉ"
+        case "J": return "Ｊ"
+        case "K": return "Ｋ"
+        case "L": return "Ｌ"
+        case "M": return "Ｍ"
+        case "N": return "Ｎ"
+        case "O": return "Ｏ"
+        case "P": return "Ｐ"
+        case "Q": return "Ｑ"
+        case "R": return "Ｒ"
+        case "S": return "Ｓ"
+        case "T": return "Ｔ"
+        case "U": return "Ｕ"
+        case "V": return "Ｖ"
+        case "W": return "Ｗ"
+        case "X": return "Ｘ"
+        case "Y": return "Ｙ"
+        case "Z": return "Ｚ"
+        case "[": return "〔"
+        case "\\": return "＼"
+        case "]": return "〕"
+        case "^": return "︿"
+        case "_": return "—"
+        case "`": return "‵"
+        case "a": return "ａ"
+        case "b": return "ｂ"
+        case "c": return "ｃ"
+        case "d": return "ｄ"
+        case "e": return "ｅ"
+        case "f": return "ｆ"
+        case "g": return "ｇ"
+        case "h": return "ｈ"
+        case "i": return "ｉ"
+        case "j": return "ｊ"
+        case "k": return "ｋ"
+        case "l": return "ｌ"
+        case "m": return "ｍ"
+        case "n": return "ｎ"
+        case "o": return "ｏ"
+        case "p": return "ｐ"
+        case "q": return "ｑ"
+        case "r": return "ｒ"
+        case "s": return "ｓ"
+        case "t": return "ｔ"
+        case "u": return "ｕ"
+        case "v": return "ｖ"
+        case "w": return "ｗ"
+        case "x": return "ｘ"
+        case "y": return "ｙ"
+        case "z": return "ｚ"
+        case "{": return "｛"
+        case "|": return "｜"
+        case "}": return "｝"
+        case "~": return "～"
+        default: return nil
+        }
     }
 
     private func getChewingBuffer(_ ctx: OpaquePointer) -> String {
