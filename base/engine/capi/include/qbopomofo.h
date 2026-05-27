@@ -172,6 +172,14 @@ void qb_composing_prepare_chinese_input_at_cursor(QBComposingSession *session, i
  */
 void qb_composing_resync_chinese(QBComposingSession *session, const char *chinese_buffer);
 
+/**
+ * Re-synchronize Chinese segments after chewing buffer changed, preserving
+ * English/symbol segment positions when candidate replacement changes length.
+ */
+void qb_composing_resync_chinese_from_old(QBComposingSession *session,
+                                           const char *old_chinese_buffer,
+                                           const char *new_chinese_buffer);
+
 /** Set Shift behavior. Use QB_SHIFT_* constants. */
 void qb_composing_set_shift_behavior(QBComposingSession *session, int behavior);
 

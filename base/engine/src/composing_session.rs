@@ -694,6 +694,114 @@ impl ComposingSession {
         }
     }
 
+    /// Re-synchronize Chinese segments when both the old and new chewing
+    /// buffers are known. This preserves English/symbol segment positions when
+    /// a candidate replacement changes the length of a snapshotted Chinese
+    /// segment.
+    pub fn resync_chinese_from_old(&mut self, old_chinese_buffer: &str, new_chinese_buffer: &str) {
+        let old_chars: Vec<char> = old_chinese_buffer.chars().collect();
+        let new_chars: Vec<char> = new_chinese_buffer.chars().collect();
+
+        let common_prefix = old_chars
+            .iter()
+            .zip(new_chars.iter())
+            .take_while(|(a, b)| a == b)
+            .count();
+
+        let max_suffix = old_chars
+            .len()
+            .min(new_chars.len())
+            .saturating_sub(common_prefix);
+        let common_suffix = old_chars
+            .iter()
+            .rev()
+            .zip(new_chars.iter().rev())
+            .take(max_suffix)
+            .take_while(|(a, b)| a == b)
+            .count();
+
+        let old_start = common_prefix;
+        let old_end = old_chars.len().saturating_sub(common_suffix);
+        let new_replacement_len = new_chars
+            .len()
+            .saturating_sub(common_prefix + common_suffix);
+
+        if old_start != old_end || new_replacement_len > 0 {
+            self.resize_changed_chinese_segment(
+                old_chars.len(),
+                old_start,
+                old_end,
+                new_replacement_len,
+            );
+        }
+
+        self.resync_chinese(new_chinese_buffer);
+    }
+
+    fn resize_changed_chinese_segment(
+        &mut self,
+        old_buffer_len: usize,
+        old_start: usize,
+        old_end: usize,
+        new_replacement_len: usize,
+    ) {
+        let insert_idx = self.live_insert_index();
+        let mut ranges: Vec<(usize, usize, usize)> = Vec::new();
+
+        let mut start = 0usize;
+        for (idx, seg) in self.segments[..insert_idx].iter().enumerate() {
+            if let Segment::Chinese(text) = seg {
+                let end = start + text.chars().count();
+                ranges.push((idx, start, end));
+                start = end;
+            }
+        }
+
+        let before_live_end = start;
+        let mut end = old_buffer_len;
+        for (idx, seg) in self.segments[insert_idx..].iter().enumerate().rev() {
+            if let Segment::Chinese(text) = seg {
+                let start = end.saturating_sub(text.chars().count());
+                ranges.push((insert_idx + idx, start, end));
+                end = start;
+            }
+        }
+        let after_live_start = end;
+        let live_is_empty = before_live_end >= after_live_start;
+
+        let mut target: Option<(usize, usize, usize)> = None;
+        for &(idx, seg_start, seg_end) in &ranges {
+            let intersects = old_start < seg_end && old_end > seg_start;
+            let insertion_at_end_of_before_live = old_start == old_end
+                && old_start == seg_end
+                && seg_end == before_live_end
+                && live_is_empty;
+            let insertion_inside_or_at_end_of_after_live = old_start == old_end
+                && old_start > seg_start
+                && old_start <= seg_end
+                && seg_start >= after_live_start;
+
+            if intersects
+                || insertion_at_end_of_before_live
+                || insertion_inside_or_at_end_of_after_live
+            {
+                target = Some((idx, seg_start, seg_end));
+                break;
+            }
+        }
+
+        if let Some((idx, seg_start, seg_end)) = target {
+            if let Segment::Chinese(text) = &mut self.segments[idx] {
+                let old_len = seg_end.saturating_sub(seg_start);
+                let overlap_start = old_start.saturating_sub(seg_start).min(old_len);
+                let overlap_end = old_end.saturating_sub(seg_start).min(old_len);
+                let new_len =
+                    old_len - overlap_end.saturating_sub(overlap_start) + new_replacement_len;
+                *text = "x".repeat(new_len);
+            }
+        }
+    }
+
     // MARK: - Commit
 
     /// Build the full display string from segments + current buffers.
@@ -1014,5 +1122,38 @@ mod tests {
             session.display_cursor_for_chewing_cursor("你中好", "ㄅ", 2),
             3
         );
+    }
+
+    #[test]
+    fn resync_candidate_expansion_before_english_keeps_english_after_replacement() {
+        let mut session = ComposingSession::new();
+
+        assert!(session.insert_english_at('A', 2, "甲乙", "", 2));
+        session.resync_chinese_from_old("甲乙", "甲乙丙");
+
+        assert_eq!(session.build_display("甲乙丙", "", 3), "甲乙丙A");
+        assert_eq!(session.commit_all("甲乙丙"), "甲乙丙A");
+    }
+
+    #[test]
+    fn resync_candidate_expansion_after_english_keeps_english_before_replacement() {
+        let mut session = ComposingSession::new();
+
+        assert!(session.insert_english_at('A', 1, "甲乙", "", 2));
+        session.resync_chinese_from_old("甲乙", "甲乙丙");
+
+        assert_eq!(session.build_display("甲乙丙", "", 3), "甲A乙丙");
+        assert_eq!(session.commit_all("甲乙丙"), "甲A乙丙");
+    }
+
+    #[test]
+    fn resync_candidate_expansion_before_symbol_keeps_symbol_after_replacement() {
+        let mut session = ComposingSession::new();
+
+        assert!(session.insert_english_at('，', 2, "甲乙", "", 2));
+        session.resync_chinese_from_old("甲乙", "甲乙丙");
+
+        assert_eq!(session.build_display("甲乙丙", "", 3), "甲乙丙，");
+        assert_eq!(session.commit_all("甲乙丙"), "甲乙丙，");
     }
 }

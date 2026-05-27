@@ -451,7 +451,9 @@ pub extern "C" fn qb_composing_resync_chinese(
     session: *mut QBComposingSession,
     chinese_buffer: *const c_char,
 ) {
-    if session.is_null() { return; }
+    if session.is_null() {
+        return;
+    }
     let s = unsafe { &mut *session };
     let buf = if chinese_buffer.is_null() {
         ""
@@ -461,6 +463,32 @@ pub extern "C" fn qb_composing_resync_chinese(
             .unwrap_or("")
     };
     s.inner.resync_chinese(buf);
+}
+
+/// Re-synchronize Chinese segments with old/new chewing buffers.
+#[unsafe(no_mangle)]
+pub extern "C" fn qb_composing_resync_chinese_from_old(
+    session: *mut QBComposingSession,
+    old_chinese_buffer: *const c_char,
+    new_chinese_buffer: *const c_char,
+) {
+    if session.is_null() { return; }
+    let s = unsafe { &mut *session };
+    let old_buf = if old_chinese_buffer.is_null() {
+        ""
+    } else {
+        unsafe { CStr::from_ptr(old_chinese_buffer) }
+            .to_str()
+            .unwrap_or("")
+    };
+    let new_buf = if new_chinese_buffer.is_null() {
+        ""
+    } else {
+        unsafe { CStr::from_ptr(new_chinese_buffer) }
+            .to_str()
+            .unwrap_or("")
+    };
+    s.inner.resync_chinese_from_old(old_buf, new_buf);
 }
 
 /// Set Shift behavior. 0=None, 1=SmartToggle, 2=ToggleOnly.

@@ -1256,9 +1256,10 @@ class QBopomofoInputController: IMKInputController {
 
         // Resync Chinese snapshots in composing session after candidate selection
         if qb_composing_has_mixed_content(session) != 0 {
-            let newBuf = bufferAfter
-            newBuf.withCString { c in
-                qb_composing_resync_chinese(session, c)
+            bufferBefore.withCString { beforePtr in
+                bufferAfter.withCString { afterPtr in
+                    qb_composing_resync_chinese_from_old(session, beforePtr, afterPtr)
+                }
             }
         }
 
