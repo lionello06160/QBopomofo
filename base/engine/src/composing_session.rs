@@ -886,6 +886,13 @@ impl ComposingSession {
     ) {
         match self.map_display_position(cursor, chinese_buffer, bopomofo, chewing_cursor) {
             Some((0, seg_idx, char_offset)) => {
+                let old_live_index = self.live_insert_index();
+                let materialized_live = self.materialize_live_chinese(chinese_buffer);
+                let seg_idx = if materialized_live && old_live_index <= seg_idx {
+                    seg_idx + 1
+                } else {
+                    seg_idx
+                };
                 let Segment::Chinese(text) = &self.segments[seg_idx] else {
                     return;
                 };
@@ -903,6 +910,13 @@ impl ComposingSession {
                 self.live_chinese_insert_index = insertion_index;
             }
             Some((1, seg_idx, char_offset)) => {
+                let old_live_index = self.live_insert_index();
+                let materialized_live = self.materialize_live_chinese(chinese_buffer);
+                let seg_idx = if materialized_live && old_live_index <= seg_idx {
+                    seg_idx + 1
+                } else {
+                    seg_idx
+                };
                 let Segment::English(text) = &self.segments[seg_idx] else {
                     return;
                 };
@@ -940,6 +954,19 @@ impl ComposingSession {
     }
 
     // MARK: - Internal
+
+    fn materialize_live_chinese(&mut self, chinese_buffer: &str) -> bool {
+        let remaining = self.remaining_chinese(chinese_buffer);
+        if remaining.is_empty() {
+            return false;
+        }
+
+        let insert_idx = self.live_insert_index();
+        self.segments
+            .insert(insert_idx, Segment::Chinese(remaining));
+        self.live_chinese_insert_index = insert_idx + 1;
+        true
+    }
 
     fn record_mode_switch(&mut self, from_english: bool, chinese_buffer: &str) {
         if from_english {
@@ -1097,6 +1124,66 @@ mod tests {
         assert_eq!(session.build_display("甲乙丙", "", 3), "甲乙丙3");
         assert_eq!(session.display_to_chewing_cursor(3, "甲乙丙", "", 3), 3);
         assert_eq!(session.commit_all("甲乙丙"), "甲乙丙3");
+    }
+
+    #[test]
+    fn prepare_chinese_input_keeps_existing_english_before_new_chinese() {
+        let mut session = ComposingSession::new();
+
+        assert!(session.insert_english_at('3', 1, "甲乙", "", 2));
+        session.prepare_chinese_input_at(2, "甲乙", "", 1);
+
+        assert_eq!(session.build_display("甲丙乙", "", 2), "甲3丙乙");
+        assert_eq!(session.display_to_chewing_cursor(3, "甲丙乙", "", 2), 2);
+        assert_eq!(session.commit_all("甲丙乙"), "甲3丙乙");
+    }
+
+    #[test]
+    fn prepare_chinese_input_before_active_english_buffer_preserves_english_position() {
+        let mut session = ComposingSession::new();
+
+        assert!(!session.type_english('3', "甲乙"));
+        session.prepare_chinese_input_at(1, "甲乙", "", 1);
+
+        assert_eq!(session.build_display("甲丙乙", "", 2), "甲丙乙3");
+        assert_eq!(session.commit_all("甲丙乙"), "甲丙乙3");
+    }
+
+    #[test]
+    fn prepare_chinese_input_inserts_at_each_mixed_cursor_boundary() {
+        let cases = [
+            (0, 0, "丙甲乙", "丙甲3乙"),
+            (1, 1, "甲丙乙", "甲丙3乙"),
+            (2, 1, "甲丙乙", "甲3丙乙"),
+            (3, 2, "甲乙丙", "甲3乙丙"),
+        ];
+
+        for (display_cursor, expected_chewing_cursor, new_chinese, expected_display) in cases {
+            let mut session = ComposingSession::new();
+            assert!(session.insert_english_at('3', 1, "甲乙", "", 2));
+
+            session.prepare_chinese_input_at(display_cursor, "甲乙", "", 2);
+            assert_eq!(
+                session.display_to_chewing_cursor(display_cursor, "甲乙", "", 2),
+                expected_chewing_cursor
+            );
+            assert_eq!(
+                session.build_display(new_chinese, "", expected_chewing_cursor as usize + 1),
+                expected_display
+            );
+            assert_eq!(session.commit_all(new_chinese), expected_display);
+        }
+    }
+
+    #[test]
+    fn prepare_chinese_input_before_english_keeps_later_live_chinese_after_english() {
+        let mut session = ComposingSession::new();
+
+        assert!(session.insert_english_at('3', 1, "甲", "", 1));
+        session.prepare_chinese_input_at(1, "甲乙", "", 1);
+
+        assert_eq!(session.build_display("甲丙乙", "", 2), "甲丙3乙");
+        assert_eq!(session.commit_all("甲丙乙"), "甲丙3乙");
     }
 
     #[test]
