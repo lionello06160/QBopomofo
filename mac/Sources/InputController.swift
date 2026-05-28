@@ -598,6 +598,7 @@ class QBopomofoInputController: IMKInputController {
                     } else {
                         // Select the first target
                         let target = spaceCycleTargets[0]
+                        let bufferBeforeChoice = getChewingBuffer(ctx)
                         if let idx = candidates.firstIndex(of: target) {
                             chewing_cand_choose_by_index(ctx, Int32(idx))
                             dbg("spaceCycle: → '\(target)' step=0")
@@ -608,7 +609,11 @@ class QBopomofoInputController: IMKInputController {
 
                         if qb_composing_has_mixed_content(session) != 0 {
                             let newBuf = getChewingBuffer(ctx)
-                            newBuf.withCString { c in qb_composing_resync_chinese(session, c) }
+                            bufferBeforeChoice.withCString { beforePtr in
+                                newBuf.withCString { afterPtr in
+                                    qb_composing_resync_chinese_from_old(session, beforePtr, afterPtr)
+                                }
+                            }
                         }
                     }
                 } else {
@@ -623,6 +628,7 @@ class QBopomofoInputController: IMKInputController {
                 if inCandidateMode(ctx) {
                     let candidates = getCandidateList(ctx)
                     let target = spaceCycleTargets[spaceCycleStep]
+                    let bufferBeforeChoice = getChewingBuffer(ctx)
                     if let idx = candidates.firstIndex(of: target) {
                         chewing_cand_choose_by_index(ctx, Int32(idx))
                         dbg("spaceCycle: → '\(target)' step=\(spaceCycleStep)")
@@ -637,7 +643,11 @@ class QBopomofoInputController: IMKInputController {
 
                     if qb_composing_has_mixed_content(session) != 0 {
                         let newBuf = getChewingBuffer(ctx)
-                        newBuf.withCString { c in qb_composing_resync_chinese(session, c) }
+                        bufferBeforeChoice.withCString { beforePtr in
+                            newBuf.withCString { afterPtr in
+                                qb_composing_resync_chinese_from_old(session, beforePtr, afterPtr)
+                            }
+                        }
                     }
                 } else {
                     spaceCycleRemaining = 0
