@@ -262,6 +262,11 @@ class QBopomofoInputController: IMKInputController {
             || qb_composing_has_mixed_content(session) != 0
         if let npChar = numpadCharacter(for: keyCode), !isCandMode {
             guard hasContent else { return false }
+            if chewing_bopomofo_Check(ctx) != 0 {
+                commitAll(ctx: ctx, session: session, client: client, source: "numpadBeforeBopomofo")
+                client.insertText(String(npChar), replacementRange: NSRange(location: NSNotFound, length: 0))
+                return true
+            }
             return insertASCIIIntoComposition(npChar, ctx: ctx, session: session, client: client, source: "numpad")
         }
         if keyCode == 49 && hasContent && !isCandMode && chewing_bopomofo_Check(ctx) == 0 {

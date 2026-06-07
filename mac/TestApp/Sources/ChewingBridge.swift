@@ -315,6 +315,29 @@ final class ChewingBridge: ObservableObject {
             return true
         }
 
+        if let digit = numpadCharacter(for: keyCode),
+           chewing_buffer_Len(ctx) > 0 || chewing_bopomofo_Check(ctx) != 0 || qb_composing_has_mixed_content(session) != 0 {
+            if chewing_bopomofo_Check(ctx) != 0 {
+                commitAll()
+                committedText += String(digit)
+                log("Key numpad after reading commit: '\(digit)'")
+                return true
+            }
+
+            let chinBuf = getChewingBufferString()
+            let directCommit = chinBuf.withCString { cStr in
+                qb_composing_type_english(session, UInt8(digit.asciiValue ?? 0), cStr)
+            }
+            if directCommit != 0 {
+                committedText += String(digit)
+                log("Key numpad (direct): '\(digit)'")
+            } else {
+                log("Key numpad (mixed): '\(digit)'")
+            }
+            updateState()
+            return true
+        }
+
         // Chinese mode — send to chewing engine
         let handled = processKey(ctx: ctx, keyCode: keyCode, chars: characters)
 
@@ -407,6 +430,28 @@ final class ChewingBridge: ObservableObject {
             return true
         }
         return false
+    }
+
+    private func numpadCharacter(for keyCode: UInt16) -> Character? {
+        switch keyCode {
+        case 82: return "0"
+        case 83: return "1"
+        case 84: return "2"
+        case 85: return "3"
+        case 86: return "4"
+        case 87: return "5"
+        case 88: return "6"
+        case 89: return "7"
+        case 91: return "8"
+        case 92: return "9"
+        case 75: return "/"
+        case 67: return "*"
+        case 78: return "-"
+        case 69: return "+"
+        case 65: return "."
+        case 81: return "="
+        default: return nil
+        }
     }
 
     // MARK: - Commit
