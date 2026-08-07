@@ -1,0 +1,4 @@
+module CChewing {
+    umbrella "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/capi/include"
+    export *
+}

@@ -1,0 +1,136 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "CChewing-arm64-apple-macosx-debug.module": ["<CChewing-arm64-apple-macosx-debug.module>"]
+  "ChewingTests-arm64-apple-macosx-debug.module": ["<ChewingTests-arm64-apple-macosx-debug.module>"]
+  "PackageStructure": ["<PackageStructure>"]
+  "libchewingPackageTests-arm64-apple-macosx-debug.module": ["<libchewingPackageTests-arm64-apple-macosx-debug.module>"]
+  "libchewingPackageTests-arm64-apple-macosx-debug.test": ["<libchewingPackageTests-arm64-apple-macosx-debug.test>"]
+  "main": ["<CChewing-arm64-apple-macosx-debug.module>"]
+  "test": ["<CChewing-arm64-apple-macosx-debug.module>","<ChewingTests-arm64-apple-macosx-debug.module>","<libchewingPackageTests-arm64-apple-macosx-debug.test>"]
+default: "main"
+nodes:
+  "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/plugins/outputs/engine/CChewing/destination/CargoBuild/cargo-target/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/capi/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/swift/tools/CargoBuildPlugin/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/swift/unit_tests/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+commands:
+  "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/CChewing.build/src/chewing.c.o":
+    tool: clang
+    inputs: ["<CChewing-arm64-apple-macosx-debug.module-resources>","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/capi/src/chewing.c"]
+    outputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/CChewing.build/src/chewing.c.o"]
+    description: "Compiling CChewing src/chewing.c"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang","-fobjc-arc","-target","arm64-apple-macosx10.13","-O0","-DSWIFT_PACKAGE=1","-DDEBUG=1","-fblocks","-index-store-path","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/index/store","-fmodules","-fmodule-name=CChewing","-fmodules-cache-path=/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ModuleCache","-I","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/capi/include","-isysroot","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-fPIC","-g","-MD","-MT","dependencies","-MF","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/CChewing.build/src/chewing.c.d","-c","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/capi/src/chewing.c","-o","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/CChewing.build/src/chewing.c.o"]
+    deps: "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/CChewing.build/src/chewing.c.d"
+
+  "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/swift/unit_tests/ChewingTests_Suite1.swift","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/swift/unit_tests/ChewingTests_Suite2.swift","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/swift/unit_tests/TestUtilAPIs.swift"]
+    outputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/sources"]
+    description: "Write auxiliary file /Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/sources"
+
+  "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.derived/runner.swift"]
+    outputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.build/sources"]
+    description: "Write auxiliary file /Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.build/sources"
+
+  "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.derived/runner.swift":
+    tool: test-entry-point-tool
+    inputs: []
+    outputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.derived/runner.swift"]
+
+  "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/CChewing.build/src/chewing.c.o","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/ChewingTests_Suite1.swift.o","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/ChewingTests_Suite2.swift.o","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/TestUtilAPIs.swift.o","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.build/runner.swift.o"]
+    outputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.product/Objects.LinkFileList"
+
+  "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewing_CChewing.bundle/.rustc_info.json":
+    tool: copy-tool
+    inputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/plugins/outputs/engine/CChewing/destination/CargoBuild/cargo-target/.rustc_info.json"]
+    outputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewing_CChewing.bundle/.rustc_info.json"]
+    description: "Copying /Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/plugins/outputs/engine/CChewing/destination/CargoBuild/cargo-target/.rustc_info.json"
+
+  "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewing_CChewing.bundle/CACHEDIR.TAG":
+    tool: copy-tool
+    inputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/plugins/outputs/engine/CChewing/destination/CargoBuild/cargo-target/CACHEDIR.TAG"]
+    outputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewing_CChewing.bundle/CACHEDIR.TAG"]
+    description: "Copying /Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/plugins/outputs/engine/CChewing/destination/CargoBuild/cargo-target/CACHEDIR.TAG"
+
+  "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewing_CChewing.bundle/release":
+    tool: copy-tool
+    inputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/plugins/outputs/engine/CChewing/destination/CargoBuild/cargo-target/release/"]
+    outputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewing_CChewing.bundle/release/"]
+    description: "Copying /Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/plugins/outputs/engine/CChewing/destination/CargoBuild/cargo-target/release"
+
+  "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"]
+    outputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+
+  "<CChewing-arm64-apple-macosx-debug.module>":
+    tool: phony
+    inputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/CChewing.build/src/chewing.c.o"]
+    outputs: ["<CChewing-arm64-apple-macosx-debug.module>"]
+
+  "<ChewingTests-arm64-apple-macosx-debug.module>":
+    tool: phony
+    inputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/ChewingTests_Suite1.swift.o","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/ChewingTests_Suite2.swift.o","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/TestUtilAPIs.swift.o","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/Modules/ChewingTests.swiftmodule"]
+    outputs: ["<ChewingTests-arm64-apple-macosx-debug.module>"]
+
+  "<libchewingPackageTests-arm64-apple-macosx-debug.module>":
+    tool: phony
+    inputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.build/runner.swift.o","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/Modules/libchewingPackageTests.swiftmodule"]
+    outputs: ["<libchewingPackageTests-arm64-apple-macosx-debug.module>"]
+
+  "<libchewingPackageTests-arm64-apple-macosx-debug.test>":
+    tool: phony
+    inputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.xctest/Contents/MacOS/libchewingPackageTests"]
+    outputs: ["<libchewingPackageTests-arm64-apple-macosx-debug.test>"]
+
+  "C.ChewingTests-arm64-apple-macosx-debug.module":
+    tool: shell
+    inputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/swift/unit_tests/ChewingTests_Suite1.swift","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/swift/unit_tests/ChewingTests_Suite2.swift","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/swift/unit_tests/TestUtilAPIs.swift","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/CChewing.build/src/chewing.c.o","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/sources"]
+    outputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/ChewingTests_Suite1.swift.o","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/ChewingTests_Suite2.swift.o","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/TestUtilAPIs.swift.o","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/Modules/ChewingTests.swiftmodule"]
+    description: "Compiling Swift Module 'ChewingTests' (3 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","ChewingTests","-emit-dependencies","-emit-module","-emit-module-path","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/Modules/ChewingTests.swiftmodule","-output-file-map","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/output-file-map.json","-parse-as-library","-incremental","-c","@/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/sources","-I","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx14.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-Xfrontend","-enable-cross-import-overlays","-j10","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-Xcc","-fmodule-map-file=/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/CChewing.build/module.modulemap","-Xcc","-I","-Xcc","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/capi/include","-module-cache-path","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-parse-as-library","-swift-version","6","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","engine"]
+
+  "C.libchewingPackageTests-arm64-apple-macosx-debug.module":
+    tool: shell
+    inputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.derived/runner.swift","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/Modules/ChewingTests.swiftmodule","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.build/sources"]
+    outputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.build/runner.swift.o","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/Modules/libchewingPackageTests.swiftmodule"]
+    description: "Compiling Swift Module 'libchewingPackageTests' (1 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","libchewingPackageTests","-emit-dependencies","-emit-module","-emit-module-path","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/Modules/libchewingPackageTests.swiftmodule","-output-file-map","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.build/output-file-map.json","-parse-as-library","-incremental","-c","@/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.build/sources","-I","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx10.13","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-Xfrontend","-enable-cross-import-overlays","-j10","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-Xcc","-fmodule-map-file=/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/CChewing.build/module.modulemap","-Xcc","-I","-Xcc","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/capi/include","-module-cache-path","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-parse-as-library","-emit-objc-header","-emit-objc-header-path","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.build/include/libchewingPackageTests-Swift.h","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","engine"]
+
+  "C.libchewingPackageTests-arm64-apple-macosx-debug.test":
+    tool: shell
+    inputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/CChewing.build/src/chewing.c.o","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/ChewingTests_Suite1.swift.o","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/ChewingTests_Suite2.swift.o","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/TestUtilAPIs.swift.o","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.build/runner.swift.o","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.product/Objects.LinkFileList"]
+    outputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.xctest/Contents/MacOS/libchewingPackageTests"]
+    description: "Linking ./.build/arm64-apple-macosx/debug/libchewingPackageTests.xctest/Contents/MacOS/libchewingPackageTests"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-L","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug","-o","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.xctest/Contents/MacOS/libchewingPackageTests","-module-name","libchewingPackageTests","-Xlinker","-no_warn_duplicate_libraries","-Xlinker","-bundle","-Xlinker","-rpath","-Xlinker","@loader_path/../../../","@/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx14.0","-lchewing_capi","-L",".build/plugins/outputs/libchewing/CChewing/destination/CargoBuild/cargo-target/release","-L",".build/plugins/outputs/engine/CChewing/destination/CargoBuild/cargo-target/release","-L","../../base/engine/target/release","-Xlinker","-add_ast_path","-Xlinker","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/Modules/ChewingTests.swiftmodule","-Xlinker","-add_ast_path","-Xlinker","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/Modules/libchewingPackageTests.swiftmodule","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g"]
+
+  "CChewing-arm64-apple-macosx-debug.module-resources":
+    tool: phony
+    inputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewing_CChewing.bundle/CACHEDIR.TAG","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewing_CChewing.bundle/release/","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewing_CChewing.bundle/.rustc_info.json"]
+    outputs: ["<CChewing-arm64-apple-macosx-debug.module-resources>"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/capi/","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/swift/tools/CargoBuildPlugin/","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/swift/unit_tests/","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/plugins/outputs/engine/CChewing/destination/CargoBuild/cargo-target/","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/Package.swift","/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+

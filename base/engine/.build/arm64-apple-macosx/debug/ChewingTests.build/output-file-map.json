@@ -1,0 +1,26 @@
+{
+  "": {
+    "swift-dependencies": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/primary.swiftdeps"
+  },
+  "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/swift/unit_tests/ChewingTests_Suite1.swift": {
+    "dependencies": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/ChewingTests_Suite1.d",
+    "object": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/ChewingTests_Suite1.swift.o",
+    "swiftmodule": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/ChewingTests_Suite1~partial.swiftmodule",
+    "swift-dependencies": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/ChewingTests_Suite1.swiftdeps",
+    "diagnostics": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/ChewingTests_Suite1.dia"
+  },
+  "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/swift/unit_tests/ChewingTests_Suite2.swift": {
+    "dependencies": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/ChewingTests_Suite2.d",
+    "object": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/ChewingTests_Suite2.swift.o",
+    "swiftmodule": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/ChewingTests_Suite2~partial.swiftmodule",
+    "swift-dependencies": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/ChewingTests_Suite2.swiftdeps",
+    "diagnostics": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/ChewingTests_Suite2.dia"
+  },
+  "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/swift/unit_tests/TestUtilAPIs.swift": {
+    "dependencies": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/TestUtilAPIs.d",
+    "object": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/TestUtilAPIs.swift.o",
+    "swiftmodule": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/TestUtilAPIs~partial.swiftmodule",
+    "swift-dependencies": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/TestUtilAPIs.swiftdeps",
+    "diagnostics": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/ChewingTests.build/TestUtilAPIs.dia"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.build/primary.swiftdeps"
+  },
+  "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.derived/runner.swift": {
+    "dependencies": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.build/runner.d",
+    "object": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.build/runner.swift.o",
+    "swiftmodule": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.build/runner~partial.swiftmodule",
+    "swift-dependencies": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.build/runner.swiftdeps",
+    "diagnostics": "/Users/lionel/Documents/VSCODE/QBopomofo/base/engine/.build/arm64-apple-macosx/debug/libchewingPackageTests.build/runner.dia"
+  }
+}

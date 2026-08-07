@@ -1058,7 +1058,8 @@ class QBopomofoInputController: IMKInputController {
         }
         if directCommit != 0 {
             dbg("insertText='\(ch)' [source:\(source)]")
-            client.insertText(String(ch), replacementRange: NSRange(location: NSNotFound, length: lastMarkedUtf16Length))
+            clearPendingMarkedText(client)
+            client.insertText(String(ch), replacementRange: NSRange(location: NSNotFound, length: 0))
             lastMarkedUtf16Length = 0
         } else {
             updateClientDisplay(ctx: ctx, session: session, client: client)
@@ -1113,9 +1114,21 @@ class QBopomofoInputController: IMKInputController {
         }
 
         dbg("insertText='\(text)' [source:\(source)]")
-        client.insertText(text, replacementRange: NSRange(location: NSNotFound, length: lastMarkedUtf16Length))
+        clearPendingMarkedText(client)
+        client.insertText(text, replacementRange: NSRange(location: NSNotFound, length: 0))
         lastMarkedUtf16Length = 0
         return true
+    }
+
+    private func clearPendingMarkedText(_ client: IMKTextInput) {
+        if lastMarkedUtf16Length > 0 {
+            client.setMarkedText(
+                "",
+                selectionRange: NSRange(location: 0, length: 0),
+                replacementRange: NSRange(location: NSNotFound, length: lastMarkedUtf16Length)
+            )
+            lastMarkedUtf16Length = 0
+        }
     }
 
     private func fullWidthASCIIString(for ch: Character) -> String? {
