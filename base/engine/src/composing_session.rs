@@ -238,20 +238,30 @@ impl ComposingSession {
         let prefix = self.chinese_snapshot_before_live();
         let suffix = self.chinese_snapshot_after_live();
 
-        if let Some(rest) = chinese_buffer.strip_prefix(&prefix) {
-            if suffix.is_empty() {
-                return rest.to_string();
-            }
-            if let Some(middle) = rest.strip_suffix(&suffix) {
-                return middle.to_string();
-            }
-        }
+        // Snapshot boundaries are positional. Chewing may re-segment an earlier
+        // phrase after later Chinese input (for example, "組字時" can become the
+        // prefix of "組字實用"). Comparing snapshot text in that case would fail
+        // and replay the entire live buffer after the already-rendered snapshot.
+        // Candidate changes explicitly resync snapshot contents and lengths; for
+        // ordinary typing, keep the mixed-language boundary fixed by character
+        // count and expose only the live slice between the snapshots.
+        let buffer_len = chinese_buffer.chars().count();
+        let start = prefix.chars().count().min(buffer_len);
+        let suffix_len = suffix.chars().count().min(buffer_len.saturating_sub(start));
+        let end = buffer_len - suffix_len;
 
-        if chinese_buffer.is_empty() {
-            String::new()
-        } else {
-            chinese_buffer.to_string()
-        }
+        let start_byte = chinese_buffer
+            .char_indices()
+            .nth(start)
+            .map(|(index, _)| index)
+            .unwrap_or(chinese_buffer.len());
+        let end_byte = chinese_buffer
+            .char_indices()
+            .nth(end)
+            .map(|(index, _)| index)
+            .unwrap_or(chinese_buffer.len());
+
+        chinese_buffer[start_byte..end_byte].to_string()
     }
 
     fn split_live_chinese(&self, chinese_buffer: &str, chewing_cursor: usize) -> (String, String, usize) {
@@ -1056,6 +1066,28 @@ mod tests {
         assert_eq!(session.display_to_chewing_cursor(3, "甲乙", "", 2), 2);
         assert_eq!(session.build_display("甲乙丙丁", "", 2), "甲乙3丙丁");
         assert_eq!(session.commit_all("甲乙丙丁"), "甲乙3丙丁");
+    }
+
+    #[test]
+    fn resegmented_chinese_before_mixed_boundary_does_not_replay_snapshot() {
+        let mut session = ComposingSession::new();
+
+        assert!(session.insert_english_at('，', 3, "組字時", "", 3));
+
+        // Adding 「用」 makes Chewing re-segment its full buffer from
+        // 「組字時」 to 「組字實用」. The text before the comma is a fixed
+        // snapshot; only the fourth live Chinese character belongs after it.
+        assert_eq!(session.build_display("組字實用", "", 4), "組字時，用");
+        assert_eq!(
+            session.display_cursor_for_chewing_cursor("組字實用", "", 4),
+            5
+        );
+
+        // The next Shift+letter must append at the real display cursor rather
+        // than reintroducing the Chinese snapshot that precedes the comma.
+        assert!(session.insert_english_at('p', 5, "組字實用", "", 4));
+        assert_eq!(session.build_display("組字實用", "", 4), "組字時，用p");
+        assert_eq!(session.commit_all("組字實用"), "組字時，用p");
     }
 
     #[test]

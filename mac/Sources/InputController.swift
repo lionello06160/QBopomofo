@@ -4,6 +4,7 @@ import CChewing
 
 /// Debug mode: env var OR user preference
 private let kDebugMode = ProcessInfo.processInfo.environment["QBOPOMOFO_DEBUG"] != nil
+private let kCurrentClientRange = NSRange(location: NSNotFound, length: NSNotFound)
 private var kPersistentLog: Bool {
     kDebugMode || UserDefaults.standard.bool(forKey: "org.qbopomofo.persistentLog")
 }
@@ -118,11 +119,13 @@ class QBopomofoInputController: IMKInputController {
     override func activateServer(_ sender: Any!) {
         currentClient = sender as? IMKTextInput
         if chewingContext == nil { initializeEngine() }
+        discardStaleActivationState()
         dbg("Server activated")
     }
 
     override func deactivateServer(_ sender: Any!) {
         commitComposition(sender)
+        resetTransientDisplayState()
         currentClient = nil
         dbg("Server deactivated")
     }
@@ -264,7 +267,7 @@ class QBopomofoInputController: IMKInputController {
             guard hasContent else { return false }
             if chewing_bopomofo_Check(ctx) != 0 {
                 commitAll(ctx: ctx, session: session, client: client, source: "numpadBeforeBopomofo")
-                client.insertText(String(npChar), replacementRange: NSRange(location: NSNotFound, length: 0))
+                client.insertText(String(npChar), replacementRange: kCurrentClientRange)
                 return true
             }
             return insertASCIIIntoComposition(npChar, ctx: ctx, session: session, client: client, source: "numpad")
@@ -286,7 +289,7 @@ class QBopomofoInputController: IMKInputController {
                 return false
             }
             if keyCode == 49 { // Space → output space
-                client.insertText(" ", replacementRange: NSRange(location: NSNotFound, length: 0))
+                client.insertText(" ", replacementRange: kCurrentClientRange)
                 return true
             }
         }
@@ -744,7 +747,7 @@ class QBopomofoInputController: IMKInputController {
                         return text
                     }
                     dbg("commit='\(result)' [source:updateDisplayMixed]")
-                    client.insertText(result, replacementRange: NSRange(location: NSNotFound, length: lastMarkedUtf16Length))
+                    client.insertText(result, replacementRange: kCurrentClientRange)
                     lastMarkedUtf16Length = 0
                     mixedDisplayCursor = nil
                     savedMixedCursor = nil
@@ -752,7 +755,7 @@ class QBopomofoInputController: IMKInputController {
                 }
 
                 dbg("commit='\(text)' [source:updateDisplay]")
-                client.insertText(text, replacementRange: NSRange(location: NSNotFound, length: lastMarkedUtf16Length))
+                client.insertText(text, replacementRange: kCurrentClientRange)
                 lastMarkedUtf16Length = 0
 
                 // If buffer is now empty, we are done
@@ -846,14 +849,14 @@ class QBopomofoInputController: IMKInputController {
             client.setMarkedText(
                 attrStr,
                 selectionRange: NSRange(location: cursorPos, length: 0),
-                replacementRange: NSRange(location: NSNotFound, length: lastMarkedUtf16Length)
+                replacementRange: kCurrentClientRange
             )
             lastMarkedUtf16Length = displayUtf16Length
         } else if lastMarkedUtf16Length > 0 {
             client.setMarkedText(
                 "",
                 selectionRange: NSRange(location: 0, length: 0),
-                replacementRange: NSRange(location: NSNotFound, length: lastMarkedUtf16Length)
+                replacementRange: kCurrentClientRange
             )
             lastMarkedUtf16Length = 0
             lastDisplayCharCount = 0
@@ -907,10 +910,10 @@ class QBopomofoInputController: IMKInputController {
 
         if !result.isEmpty {
             dbg("commitAll='\(result)' [source:\(source)]")
-            client.insertText(result, replacementRange: NSRange(location: NSNotFound, length: lastMarkedUtf16Length))
+            client.insertText(result, replacementRange: kCurrentClientRange)
             lastMarkedUtf16Length = 0
         } else if lastMarkedUtf16Length > 0 {
-            client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: lastMarkedUtf16Length))
+            client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: kCurrentClientRange)
             lastMarkedUtf16Length = 0
         }
         chewing_Reset(ctx)
@@ -929,9 +932,13 @@ class QBopomofoInputController: IMKInputController {
             dbg("commitComposition called (no client)")
             return
         }
-        // Skip if nothing to commit
-        if chewing_buffer_Len(ctx) == 0 && chewing_bopomofo_Check(ctx) == 0 {
-            dbg("commitComposition called (empty, skip)")
+        if !hasPendingComposition(ctx: ctx, session: session) {
+            if lastMarkedUtf16Length > 0 {
+                dbg("commitComposition clearing stale marked text")
+                resetTransientDisplayState(client: client)
+            } else {
+                dbg("commitComposition called (empty, skip)")
+            }
             return
         }
         dbg("commitComposition called")
@@ -964,6 +971,48 @@ class QBopomofoInputController: IMKInputController {
 
 
     // MARK: - Helpers
+
+    private func hasPendingComposition(ctx: OpaquePointer, session: OpaquePointer) -> Bool {
+        chewing_buffer_Len(ctx) > 0
+            || chewing_bopomofo_Check(ctx) != 0
+            || qb_composing_has_mixed_content(session) != 0
+    }
+
+    private func resetTransientDisplayState(client: IMKTextInput? = nil) {
+        if let client, lastMarkedUtf16Length > 0 {
+            client.setMarkedText(
+                "",
+                selectionRange: NSRange(location: 0, length: 0),
+                replacementRange: kCurrentClientRange
+            )
+        }
+        if candidatePanel.isPanelVisible {
+            candidatePanel.hidePanel()
+        }
+        mixedDisplayCursor = nil
+        savedMixedCursor = nil
+        lastDisplayCharCount = 0
+        lastMarkedUtf16Length = 0
+        spaceCycleRemaining = spaceCycleMax
+        spaceCycleTargets = []
+        spaceCycleStep = 0
+        spaceCycleSavedCursor = nil
+    }
+
+    private func discardStaleActivationState() {
+        guard let ctx = chewingContext, let session = composingSession else { return }
+
+        let hasStaleComposition = hasPendingComposition(ctx: ctx, session: session)
+        let shiftWasLeftHeld = qb_composing_is_shift_held(session) != 0
+
+        if hasStaleComposition || shiftWasLeftHeld {
+            dbg("Discarding stale activation state pending=\(hasStaleComposition) shiftHeld=\(shiftWasLeftHeld)")
+            chewing_Reset(ctx)
+            qb_composing_clear(session)
+        }
+
+        resetTransientDisplayState()
+    }
 
     /// Move the chewing engine cursor to the target position by sending Left/Right keys.
     private func syncChewingCursor(ctx: OpaquePointer, target: Int) {
@@ -1033,6 +1082,16 @@ class QBopomofoInputController: IMKInputController {
     ) -> Bool {
         guard ch.isASCII, let ascii = ch.asciiValue else { return false }
 
+        let hasComposition = chewing_buffer_Len(ctx) > 0
+            || chewing_bopomofo_Check(ctx) != 0
+            || qb_composing_has_mixed_content(session) != 0
+            || lastMarkedUtf16Length > 0
+        if !hasComposition {
+            dbg("insertText='\(ch)' [source:\(source)]")
+            client.insertText(String(ch), replacementRange: kCurrentClientRange)
+            return true
+        }
+
         let chinBuf = getChewingBuffer(ctx)
         let bopo = getBopomofoReading(ctx)
 
@@ -1059,7 +1118,7 @@ class QBopomofoInputController: IMKInputController {
         if directCommit != 0 {
             dbg("insertText='\(ch)' [source:\(source)]")
             clearPendingMarkedText(client)
-            client.insertText(String(ch), replacementRange: NSRange(location: NSNotFound, length: 0))
+            client.insertText(String(ch), replacementRange: kCurrentClientRange)
             lastMarkedUtf16Length = 0
         } else {
             updateClientDisplay(ctx: ctx, session: session, client: client)
@@ -1083,7 +1142,7 @@ class QBopomofoInputController: IMKInputController {
 
         if !hasComposition {
             dbg("insertText='\(text)' [source:\(source)]")
-            client.insertText(text, replacementRange: NSRange(location: NSNotFound, length: 0))
+            client.insertText(text, replacementRange: kCurrentClientRange)
             return true
         }
 
@@ -1115,7 +1174,7 @@ class QBopomofoInputController: IMKInputController {
 
         dbg("insertText='\(text)' [source:\(source)]")
         clearPendingMarkedText(client)
-        client.insertText(text, replacementRange: NSRange(location: NSNotFound, length: 0))
+        client.insertText(text, replacementRange: kCurrentClientRange)
         lastMarkedUtf16Length = 0
         return true
     }
@@ -1125,7 +1184,7 @@ class QBopomofoInputController: IMKInputController {
             client.setMarkedText(
                 "",
                 selectionRange: NSRange(location: 0, length: 0),
-                replacementRange: NSRange(location: NSNotFound, length: lastMarkedUtf16Length)
+                replacementRange: kCurrentClientRange
             )
             lastMarkedUtf16Length = 0
         }
