@@ -222,9 +222,14 @@ class QBopomofoInputController: IMKInputController {
         // Handle Shift key press/release (flagsChanged)
         if event.type == .flagsChanged {
             let isShift = event.modifierFlags.contains(.shift)
+            let wasEnglish = qb_composing_is_english(session) != 0
             let chineseBuf = getChewingBuffer(ctx)
             let changed = chineseBuf.withCString { cStr in
                 qb_composing_handle_shift(session, isShift ? 1 : 0, cStr)
+            }
+            let isEnglish = qb_composing_is_english(session) != 0
+            if wasEnglish != isEnglish {
+                InputModeIndicator.schedule(isEnglish: isEnglish, client: client)
             }
             if changed != 0 { updateClientDisplay(ctx: ctx, session: session, client: client) }
             return changed != 0
