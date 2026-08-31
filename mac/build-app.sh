@@ -64,6 +64,7 @@ cp "$DATA_DIR/swkb.dat" "$APP_BUNDLE/Contents/Resources/"
 
 # Icons
 cp "$SCRIPT_DIR/Resources/QBopomofo.tiff" "$APP_BUNDLE/Contents/Resources/" 2>/dev/null
+cp "$SCRIPT_DIR/Resources/QBopomofoIndicator.tiff" "$APP_BUNDLE/Contents/Resources/" 2>/dev/null
 cp "$SCRIPT_DIR/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/" 2>/dev/null
 
 # Localization

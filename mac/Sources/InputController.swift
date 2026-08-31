@@ -117,15 +117,27 @@ class QBopomofoInputController: IMKInputController {
     // MARK: - IMKStateSetting
 
     override func activateServer(_ sender: Any!) {
+        super.activateServer(sender)
+        if let staleClient = currentClient {
+            resetTransientDisplayState(client: staleClient)
+        }
         currentClient = sender as? IMKTextInput
+        forceClearMarkedText(currentClient)
         if chewingContext == nil { initializeEngine() }
         discardStaleActivationState()
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.forceClearMarkedText(self.currentClient)
+        }
         dbg("Server activated")
     }
 
     override func deactivateServer(_ sender: Any!) {
-        commitComposition(sender)
-        resetTransientDisplayState()
+        super.deactivateServer(sender)
+        let client = sender as? IMKTextInput ?? currentClient
+        commitComposition(client)
+        forceClearMarkedText(client)
+        resetTransientDisplayState(client: client)
         currentClient = nil
         dbg("Server deactivated")
     }
@@ -870,6 +882,10 @@ class QBopomofoInputController: IMKInputController {
             // Only show candidates for current page
             let perPage = Int(chewing_get_candPerPage(ctx))
             let pageList = Array(candList.prefix(perPage))
+            if pageList.isEmpty {
+                candidatePanel.hidePanel()
+                return
+            }
             candidatePanel.setCandidates(pageList, page: page, totalPages: totalPages)
             dbg("candidatePanel count=\(pageList.count) page=\(page+1)/\(totalPages)")
 
@@ -979,13 +995,7 @@ class QBopomofoInputController: IMKInputController {
     }
 
     private func resetTransientDisplayState(client: IMKTextInput? = nil) {
-        if let client, lastMarkedUtf16Length > 0 {
-            client.setMarkedText(
-                "",
-                selectionRange: NSRange(location: 0, length: 0),
-                replacementRange: kCurrentClientRange
-            )
-        }
+        forceClearMarkedText(client)
         if candidatePanel.isPanelVisible {
             candidatePanel.hidePanel()
         }
@@ -1181,13 +1191,19 @@ class QBopomofoInputController: IMKInputController {
 
     private func clearPendingMarkedText(_ client: IMKTextInput) {
         if lastMarkedUtf16Length > 0 {
-            client.setMarkedText(
-                "",
-                selectionRange: NSRange(location: 0, length: 0),
-                replacementRange: kCurrentClientRange
-            )
+            forceClearMarkedText(client)
             lastMarkedUtf16Length = 0
         }
+    }
+
+    private func forceClearMarkedText(_ client: IMKTextInput?) {
+        guard let client else { return }
+        client.setMarkedText(
+            "",
+            selectionRange: NSRange(location: 0, length: 0),
+            replacementRange: kCurrentClientRange
+        )
+        lastMarkedUtf16Length = 0
     }
 
     private func fullWidthASCIIString(for ch: Character) -> String? {

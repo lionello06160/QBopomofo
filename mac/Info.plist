@@ -35,6 +35,12 @@
 	<string>QBopomofoInputController</string>
 	<key>TISInputSourceID</key>
 	<string>org.qbopomofo.inputmethod.QBopomofo</string>
+	<key>TISIntendedLanguage</key>
+	<string>zh-Hant</string>
+	<key>TISIconIsTemplate</key>
+	<false/>
+	<key>tsInputMethodIconFileKey</key>
+	<string>QBopomofoIndicator.tiff</string>
 	<key>TICapsLockLanguageSwitchCapable</key>
 	<true/>
 	<key>ComponentInputModeDict</key>
@@ -43,16 +49,25 @@
 		<dict>
 			<key>org.qbopomofo.inputmethod.QBopomofo.Bopomofo</key>
 			<dict>
+				<key>TISInputSourceID</key>
+				<string>org.qbopomofo.inputmethod.QBopomofo.Bopomofo</string>
 				<key>TISIntendedLanguage</key>
 				<string>zh-Hant</string>
+				<key>TISIconLabels</key>
+				<dict>
+					<key>Primary</key>
+					<string>Q</string>
+				</dict>
 				<key>tsInputModeScriptKey</key>
 				<string>smUnicodeScript</string>
 				<key>tsInputModeIsVisibleKey</key>
 				<true/>
 				<key>tsInputModeMenuIconFileKey</key>
-				<string>QBopomofo</string>
+				<string>QBopomofoIndicator.tiff</string>
 				<key>tsInputModeAlternateMenuIconFileKey</key>
-				<string>QBopomofo</string>
+				<string>QBopomofoIndicator.tiff</string>
+				<key>tsInputModePaletteIconFileKey</key>
+				<string>QBopomofoIndicator.tiff</string>
 				<key>tsInputModePrimaryInScriptKey</key>
 				<true/>
 				<key>tsInputModeDefaultStateKey</key>
